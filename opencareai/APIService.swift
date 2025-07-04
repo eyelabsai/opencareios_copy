@@ -13,7 +13,19 @@ enum NetworkError: LocalizedError {
         switch self {
         case .badURL(let message): return "Error creating URL: \(message)."
         case .badResponse(let statusCode, let responseBody): return "Server returned an invalid response: \(statusCode). Body: \(responseBody)"
-        case .decodingError(let error): return "Failed to decode the server's response: \(error.localizedDescription)."
+        case .decodingError(let error):
+            // Provide a more descriptive message for decoding errors
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .dataCorrupted:
+                    return "Failed to decode the server's response: The data is corrupt or missing."
+                case .keyNotFound(let key, _):
+                    return "Failed to decode the server's response: The key '\(key.stringValue)' was not found."
+                default:
+                    return "Failed to decode the server's response: The data is not in the correct format."
+                }
+            }
+            return "Failed to decode the server's response."
         case .requestFailed(let error): return "The network request failed: \(error.localizedDescription)"
         case .unknown: return "An unknown network error occurred."
         }
@@ -39,51 +51,102 @@ class APIService {
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         
-        // This creates the body of the request, sending the audio file
         request.httpBody = createTranscribeBody(from: fileURL, boundary: boundary)
         
-        // Make the network call
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        // Check the server's response
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.unknown
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let responseBody = String(data: data, encoding: .utf8) ?? "No response body"
-            throw NetworkError.badResponse(statusCode: httpResponse.statusCode, responseBody: responseBody)
-        }
-
-        // Decode the JSON response from the server
-        do {
-            let result = try JSONDecoder().decode([String: String].self, from: data)
-            return result["transcript"] ?? ""
-        } catch {
-            throw NetworkError.decodingError(error)
-        }
-    }
-
-    // --- The rest of your APIService file remains the same ---
-    // (summarizeText, sendHealthAssistantQuery, createTranscribeBody)
-    
-    func summarizeText(transcript: String) async throws -> SummarizationResponse {
-        guard let url = baseURL?.appendingPathComponent("/api/summarise") else { throw NetworkError.badURL("ServerURL not configured in Info.plist") }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONEncoder().encode(["transcript": transcript])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.badResponse(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, responseBody: String(data: data, encoding: .utf8) ?? "")
+            let responseBody = String(data: data, encoding: .utf8) ?? "No response body"
+            throw NetworkError.badResponse(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, responseBody: responseBody)
         }
+
+        struct TranscriptionResponse: Codable {
+            let success: Bool
+            let transcript: String
+        }
+
         do {
-            return try JSONDecoder().decode(SummarizationResponse.self, from: data)
+            let result = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
+            return result.transcript
         } catch {
             throw NetworkError.decodingError(error)
         }
     }
+
+    // --- THIS FUNCTION HAS BEEN CORRECTED ---
+    // Replace the existing summarizeText function with this one
+        func summarizeText(transcript: String) async throws -> SummarizationResponse {
+            guard let url = baseURL?.appendingPathComponent("/api/summarise") else { throw NetworkError.badURL("ServerURL not configured in Info.plist") }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONEncoder().encode(["transcript": transcript])
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                throw NetworkError.badResponse(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, responseBody: String(data: data, encoding: .utf8) ?? "")
+            }
+            
+            // --- Start of Corrected Code ---
+
+            // 1. Define temporary structures that exactly match the server's JSON
+            struct MedicationDTO: Codable {
+                let name: String
+                let dosage: String
+                let frequency: String
+                let timing: String?
+                let route: String?
+                let laterality: String?
+                let duration: String?
+                let fullInstructions: String
+            }
+
+            struct SummarizationResponseDTO: Codable {
+                let summary: String
+                let tldr: String
+                let specialty: String
+                let date: String
+                let medications: [MedicationDTO]
+            }
+            
+            do {
+                // 2. Decode the JSON into our temporary DTO
+                let serverResponse = try JSONDecoder().decode(SummarizationResponseDTO.self, from: data)
+                
+                // 3. Convert the DTOs into the main app models (which have the 'id' field)
+                let medications = serverResponse.medications.map { dto in
+                    Medication(
+                        id: nil, // The id is nil because it's a new medication
+                        name: dto.name,
+                        dosage: dto.dosage,
+                        frequency: dto.frequency,
+                        timing: dto.timing,
+                        route: dto.route,
+                        laterality: dto.laterality,
+                        duration: dto.duration,
+                        fullInstructions: dto.fullInstructions
+                    )
+                }
+                
+                // 4. Return the final, complete response object
+                return SummarizationResponse(
+                    summary: serverResponse.summary,
+                    tldr: serverResponse.tldr,
+                    specialty: serverResponse.specialty,
+                    date: serverResponse.date,
+                    medications: medications
+                )
+                
+            } catch {
+                print("--- Summarization Decoding Error ---")
+                print(error)
+                print("Raw server data: \(String(data: data, encoding: .utf8) ?? "Empty")")
+                print("--- End of Error ---")
+                throw NetworkError.decodingError(error)
+            }
+            // --- End of Corrected Code ---
+        }
     
     func sendHealthAssistantQuery(query: String, userId: String) async throws -> String {
         guard let url = baseURL?.appendingPathComponent("/api/health-assistant") else { throw NetworkError.badURL("ServerURL not configured in Info.plist") }
@@ -93,9 +156,11 @@ class APIService {
         request.httpBody = try? JSONEncoder().encode(["query": query, "userId": userId])
 
         let (data, response) = try await URLSession.shared.data(for: request)
+        
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.badResponse(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0, responseBody: String(data: data, encoding: .utf8) ?? "")
         }
+        
         do {
             let result = try JSONDecoder().decode([String: String].self, from: data)
             return result["answer"] ?? "No answer received."
