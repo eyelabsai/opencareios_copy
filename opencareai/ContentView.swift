@@ -1,24 +1,33 @@
-//
-//  ContentView.swift
-//  opencareai
-//
-//  Created by Shruthi Sathya on 6/29/25.
-//
-
+// Views/ContentView.swift
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+        TabView {
+            HomeView()
+                .tabItem {
+                    Label("Record", systemImage: "mic.fill")
+                }
+            
+            VisitHistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock.fill")
+                }
 
-#Preview {
-    ContentView()
+            MedicationView()
+                .tabItem {
+                    Label("Meds", systemImage: "pills.fill")
+                }
+
+            HealthAssistantView()
+                .tabItem {
+                    Label("Assistant", systemImage: "message.fill")
+                }
+
+            ProfileView()
+                .tabItem {
+                    Label("Profile", systemImage: "person.fill")
+                }
+        }
+    }
 }

@@ -6,6 +6,16 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		63D320012E17ABF700DE89B7 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320002E17ABF700DE89B7 /* FirebaseAuth */; };
+		63D320032E17ABF700DE89B7 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320022E17ABF700DE89B7 /* FirebaseFirestore */; };
+		63D320052E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320042E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community */; };
+		63D320072E17ABF700DE89B7 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320062E17ABF700DE89B7 /* FirebaseStorage */; };
+		63D3200B2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */; };
+		63D3200C2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */; };
+		63D3200D2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		63FAC7F52E11A74600538180 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,14 +34,28 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		63FAC7E42E11A74400538180 /* opencareai.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = opencareai.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		63FAC7F42E11A74600538180 /* opencareaiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = opencareaiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		63FAC7FE2E11A74600538180 /* opencareaiUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = opencareaiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		63FAC82B2E11F70C00538180 /* Exceptions for "opencareai" folder in "opencareai" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 63FAC7E32E11A74400538180 /* opencareai */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		63FAC7E62E11A74400538180 /* opencareai */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				63FAC82B2E11F70C00538180 /* Exceptions for "opencareai" folder in "opencareai" target */,
+			);
 			path = opencareai;
 			sourceTree = "<group>";
 		};
@@ -52,6 +76,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63D320052E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community in Frameworks */,
+				63D320072E17ABF700DE89B7 /* FirebaseStorage in Frameworks */,
+				63D320012E17ABF700DE89B7 /* FirebaseAuth in Frameworks */,
+				63D320032E17ABF700DE89B7 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,12 +100,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		63D31FC32E17A86300DE89B7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		63FAC7DB2E11A74400538180 = {
 			isa = PBXGroup;
 			children = (
+				63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */,
 				63FAC7E62E11A74400538180 /* opencareai */,
 				63FAC7F72E11A74600538180 /* opencareaiTests */,
 				63FAC8012E11A74600538180 /* opencareaiUITests */,
+				63D31FC32E17A86300DE89B7 /* Frameworks */,
 				63FAC7E52E11A74400538180 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -112,6 +149,10 @@
 			);
 			name = opencareai;
 			packageProductDependencies = (
+				63D320002E17ABF700DE89B7 /* FirebaseAuth */,
+				63D320022E17ABF700DE89B7 /* FirebaseFirestore */,
+				63D320042E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community */,
+				63D320062E17ABF700DE89B7 /* FirebaseStorage */,
 			);
 			productName = opencareai;
 			productReference = 63FAC7E42E11A74400538180 /* opencareai.app */;
@@ -195,6 +236,9 @@
 			);
 			mainGroup = 63FAC7DB2E11A74400538180;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				63D31FFF2E17ABF700DE89B7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 63FAC7E52E11A74400538180 /* Products */;
 			projectDirPath = "";
@@ -212,6 +256,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63D3200D2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -219,6 +264,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63D3200C2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -226,6 +272,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				63D3200B2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -396,8 +443,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"opencareai/Preview Content\"";
+				DEVELOPMENT_TEAM = 7ZP7VH8MK7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = opencareai/Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Please enable microphone access";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -424,8 +474,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"opencareai/Preview Content\"";
+				DEVELOPMENT_TEAM = 7ZP7VH8MK7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = opencareai/Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Please enable microphone access";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -552,6 +605,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		63D31FFF2E17ABF700DE89B7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		63D320002E17ABF700DE89B7 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 63D31FFF2E17ABF700DE89B7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		63D320022E17ABF700DE89B7 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 63D31FFF2E17ABF700DE89B7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		63D320042E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 63D31FFF2E17ABF700DE89B7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = "FirebaseFirestoreCombine-Community";
+		};
+		63D320062E17ABF700DE89B7 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 63D31FFF2E17ABF700DE89B7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 63FAC7DC2E11A74400538180 /* Project object */;
 }
