@@ -1,119 +1,447 @@
 // ViewModels/VisitViewModel.swift
 import Foundation
-import AVFoundation
+import Firebase
+import FirebaseAuth
+import Combine
 
-
-
-
-enum ProcessingState: String {
-    case uploading = "Uploading audio..."
-    case transcribing = "Transcribing visit..."
-    case summarizing = "Summarizing notes..."
-    case saving = "Saving visit..."
-    case none = ""
-}
-
-@MainActor
 class VisitViewModel: ObservableObject {
-    @Published var audioRecorder = AudioRecorder()
-    @Published var transcript: String = ""
-    @Published var summary: String = ""
-    @Published var isProcessing = false
+    @Published var currentStep: RecordingStep = .ready
+    @Published var progressValue: Double = 0.0
+    @Published var visitSummary: VisitSummary?
+    @Published var showingSuccess = false
     @Published var errorMessage: String?
-
-    private let apiService = APIService()
-
-    func handleStartStop() {
-        if audioRecorder.isRecording {
-            stopRecordingAndProcess()
-        } else {
-            // Use a Task to handle the async permission request
-            Task {
-                await startRecording()
-            }
+    @Published var isLoading = false
+    @Published var transcript: String = "" // Add transcript property to match web app
+    @Published var visits: [Visit] = [] // Add visits property back
+    
+    private let apiService = APIService.shared
+    private let firebaseService = OpenCareFirebaseService.shared
+    private var cancellables = Set<AnyCancellable>()
+    
+    enum RecordingStep {
+        case ready
+        case recording
+        case processing
+        case reviewing
+        case completed
+    }
+    
+    // Computed properties matching web app functionality
+    var totalVisits: Int {
+        visits.count
+    }
+    
+    var recentVisits: [Visit] {
+        Array(visits.prefix(5))
+    }
+    
+    var visitsThisMonth: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+        
+        return visits.filter { visit in
+            guard let visitDate = visit.date else { return false }
+            return visitDate >= startOfMonth
+        }.count
+    }
+    
+    var visitsBySpecialty: [String: [Visit]] {
+        Dictionary(grouping: visits) { $0.specialty ?? "Unknown" }
+    }
+    
+    var specialties: [String] {
+        Array(Set(visits.compactMap { $0.specialty })).sorted()
+    }
+    
+    init() {
+        // Load visits when initialized
+        Task {
+            await loadVisitsAsync()
         }
     }
-
-    private func startRecording() {
-            // 1. Use the new AVAudioApplication API for iOS 17+
-            AVAudioApplication.requestRecordPermission { [weak self] granted in
-                guard let self = self else { return }
-
-                // 2. Handle the response on the main thread
-                DispatchQueue.main.async {
-                    if granted {
-                        do {
-                            // We still use AVAudioSession to configure the audio hardware
-                            let recordingSession = AVAudioSession.sharedInstance()
-                            try recordingSession.setCategory(.record, mode: .default)
-                            try recordingSession.setActive(true)
-                            
-                            // 3. Start recording if permission is granted
-                            self.transcript = ""
-                            self.summary = ""
-                            self.errorMessage = nil
-                            try self.audioRecorder.startRecording()
-                        } catch {
-                            self.errorMessage = "Failed to start recording: \(error.localizedDescription)"
-                        }
-                    } else {
-                        // Permission was denied
-                        self.errorMessage = "Microphone permission was denied. Please grant it in Settings."
-                    }
+    
+    // MARK: - Load Visits
+    @MainActor
+    func loadVisitsAsync() async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            errorMessage = "User not authenticated"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let fetchedVisits = try await firebaseService.getUserVisits(userId: userId)
+            self.visits = fetchedVisits
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Create Visit
+    @MainActor
+    func createVisit(_ visit: Visit) async {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            errorMessage = "User not authenticated"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await firebaseService.createVisit(visit, userId: userId)
+            await loadVisitsAsync() // Reload visits after creation
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Process Visit with Audio
+    @MainActor
+    func processVisitWithAudio(audioData: Data, filename: String) async -> Visit? {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            errorMessage = "User not authenticated"
+            return nil
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Process audio through API
+            let visitSummary = try await apiService.processVisit(audioData: audioData, filename: filename)
+            
+            // Convert VisitSummary to Visit
+            var newVisit = Visit()
+            newVisit.userId = userId
+            newVisit.summary = visitSummary.summary
+            newVisit.tldr = visitSummary.tldr
+            newVisit.specialty = visitSummary.specialty
+            newVisit.medications = visitSummary.medications
+            // Convert medication action strings to MedicationAction objects
+            let medicationActions = visitSummary.medicationActions.compactMap { actionString -> MedicationAction? in
+                guard let actionType = MedicationActionType(rawValue: actionString) else { return nil }
+                return MedicationAction(
+                    id: UUID().uuidString,
+                    visitId: "", // Will be set by Firebase
+                    medicationId: nil,
+                    action: actionType,
+                    medicationName: "Unknown", // Default value
+                    genericReference: nil,
+                    reason: nil,
+                    newInstructions: nil,
+                    createdAt: Date()
+                )
+            }
+            newVisit.medicationActions = medicationActions
+            newVisit.chronicConditions = visitSummary.chronicConditions
+            
+            // Parse date
+            if visitSummary.date == "TODAY" {
+                newVisit.date = Date()
+            } else {
+                // Try to parse the date string
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                newVisit.date = formatter.date(from: visitSummary.date) ?? Date()
+            }
+            
+            // Save to Firebase
+            try await firebaseService.createVisit(newVisit, userId: userId)
+            
+            // Reload visits
+            await loadVisitsAsync()
+            
+            return newVisit
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Update Visit
+    @MainActor
+    func updateVisit(_ visit: Visit) async {
+        guard let visitId = visit.id else {
+            errorMessage = "Visit ID not found"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Convert Visit to dictionary for update
+            var updates: [String: Any] = [:]
+            
+            if let specialty = visit.specialty {
+                updates["specialty"] = specialty
+            }
+            if let summary = visit.summary {
+                updates["summary"] = summary
+            }
+            if let tldr = visit.tldr {
+                updates["tldr"] = tldr
+            }
+            if let date = visit.date {
+                updates["date"] = Timestamp(date: date)
+            }
+            if let medications = visit.medications {
+                updates["medications"] = medications
+            }
+            if let medicationActions = visit.medicationActions {
+                updates["medicationActions"] = medicationActions
+            }
+            if let chronicConditions = visit.chronicConditions {
+                updates["chronicConditions"] = chronicConditions
+            }
+            
+            try await firebaseService.updateVisit(visitId: visitId, updates: updates)
+            await loadVisitsAsync() // Reload visits after update
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Delete Visit
+    @MainActor
+    func deleteVisit(_ visit: Visit) async {
+        guard let visitId = visit.id else {
+            errorMessage = "Visit ID not found"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await firebaseService.deleteVisit(visitId)
+            
+            // Remove from local array
+            visits.removeAll { $0.id == visitId }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Get Visit by ID
+    func getVisitById(_ visitId: String) async -> Visit? {
+        do {
+            return try await firebaseService.getVisitById(visitId: visitId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+    
+    // MARK: - Filter Visits
+    func filterVisits(specialty: String? = nil, timeframe: String? = nil) -> [Visit] {
+        var filtered = visits
+        
+        if let specialty = specialty, specialty != "All" {
+            filtered = filtered.filter { $0.specialty == specialty }
+        }
+        
+        if let timeframe = timeframe, timeframe != "All" {
+            let calendar = Calendar.current
+            let now = Date()
+            
+            switch timeframe {
+            case "This Week":
+                let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+                filtered = filtered.filter { visit in
+                    guard let visitDate = visit.date else { return false }
+                    return visitDate >= startOfWeek
                 }
+            case "This Month":
+                let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
+                filtered = filtered.filter { visit in
+                    guard let visitDate = visit.date else { return false }
+                    return visitDate >= startOfMonth
+                }
+            case "This Year":
+                let startOfYear = calendar.dateInterval(of: .year, for: now)?.start ?? now
+                filtered = filtered.filter { visit in
+                    guard let visitDate = visit.date else { return false }
+                    return visitDate >= startOfYear
+                }
+            default:
+                break
             }
         }
+        
+        return filtered
+    }
     
-    @Published var processingState: ProcessingState = .none
-
-        private func stopRecordingAndProcess() {
-            guard let audioURL = audioRecorder.stopRecording() else {
-                self.errorMessage = "Could not get the audio file."
+    // MARK: - Clear Error
+    func clearError() {
+        errorMessage = nil
+    }
+    
+    // MARK: - Summary Generation
+    @MainActor
+    func generateSummaryFromTranscript() async {
+        guard !transcript.isEmpty else { return }
+        
+        do {
+            let summaryResponse = try await apiService.summarizeTranscript(transcript: transcript)
+            
+            // Convert MedicationAction array to [String] of action raw values
+            let medicationActionStrings: [String] = (summaryResponse.medicationActions ?? []).map { $0.action.rawValue }
+            
+            let visitSummary = VisitSummary(
+                summary: summaryResponse.summary ?? "",
+                tldr: summaryResponse.tldr ?? "",
+                specialty: summaryResponse.specialty ?? "",
+                date: summaryResponse.date ?? "",
+                medications: summaryResponse.medications ?? [],
+                medicationActions: medicationActionStrings,
+                chronicConditions: summaryResponse.chronicConditions ?? []
+            )
+            
+            self.visitSummary = visitSummary
+            
+        } catch {
+            errorMessage = "Failed to generate summary: \(error.localizedDescription)"
+        }
+    }
+    
+    // MARK: - Save Visit
+    @MainActor
+    func saveCurrentVisit() async {
+        guard let summary = visitSummary else { return }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            errorMessage = "User not authenticated"
+            return
+        }
+        
+        do {
+            let visit = Visit(
+                userId: userId,
+                date: Date(),
+                specialty: summary.specialty,
+                summary: summary.summary,
+                tldr: summary.tldr,
+                medications: summary.medications,
+                medicationActions: nil, // Not available from summary
+                chronicConditions: summary.chronicConditions,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            
+            try await firebaseService.createVisit(visit, userId: userId)
+            
+        } catch {
+            errorMessage = "Failed to save visit: \(error.localizedDescription)"
+        }
+    }
+    
+    // MARK: - Legacy Methods (for backward compatibility)
+    func loadVisits() {
+        Task {
+            await loadVisitsAsync()
+        }
+    }
+    
+    func saveVisit(_ visit: Visit) {
+        Task {
+            await createVisit(visit)
+        }
+    }
+    
+    func deleteVisit(_ visit: Visit) {
+        Task {
+            await deleteVisit(visit)
+        }
+    }
+    
+    // MARK: - Process Audio Recording
+    @MainActor
+    func processAudioRecording(_ audioData: Data) async {
+        guard Auth.auth().currentUser?.uid != nil else {
+            errorMessage = "User not authenticated"
+            return
+        }
+        
+        print("🔊 Starting audio processing...")
+        print("🔊 Audio data size: \(audioData.count) bytes")
+        
+        isLoading = true
+        errorMessage = nil
+        progressValue = 0.0
+        
+        do {
+            // Step 1: Transcribe audio
+            print("🔊 Step 1: Transcribing audio...")
+            progressValue = 0.3
+            let transcriptionResponse = try await apiService.transcribeAudio(audioData: audioData, filename: "recording.m4a")
+            
+            print("🔊 Transcription response: \(transcriptionResponse)")
+            
+            guard let transcriptText = transcriptionResponse.transcript else {
+                errorMessage = "No transcript received"
+                isLoading = false
                 return
             }
-
-            isProcessing = true
-            errorMessage = nil
-
-            Task {
-                do {
-                    // Step 1: Uploading
-                    self.processingState = .uploading
-                    let transcriptResult = try await apiService.transcribeAudio(fileURL: audioURL)
-                    
-                    // Step 2: Summarizing
-                    self.processingState = .summarizing
-                    let summaryResponse = try await apiService.summarizeText(transcript: transcriptResult)
-
-                    self.transcript = transcriptResult
-                    self.summary = summaryResponse.summary
-                    
-                    // Step 3: Saving
-                    self.processingState = .saving
-                    let newVisit = Visit(
-                        date: summaryResponse.date == "TODAY" ? Date().ISO8601Format() : summaryResponse.date,
-                        summary: summaryResponse.summary,
-                        specialty: summaryResponse.specialty,
-                        tldr: summaryResponse.tldr,
-                        transcript: transcriptResult,
-                        medications: summaryResponse.medications
-                    )
-                    
-                    FirebaseService.shared.saveVisit(newVisit) { error in
-                        if let error = error { self.errorMessage = "Failed to save visit: \(error.localizedDescription)" }
-                    }
-                    
-                    FirebaseService.shared.saveMedications(summaryResponse.medications) { error in
-                         if let error = error { self.errorMessage = "Failed to save medications: \(error.localizedDescription)" }
-                    }
-
-                } catch {
-                    self.errorMessage = (error as? LocalizedError)?.errorDescription ?? "An unknown error occurred."
-                }
-                
-                // 4. Final UI update
-                self.isProcessing = false
-                self.processingState = .none
-            }
+            
+            print("🔊 Transcript received: \(transcriptText)")
+            transcript = transcriptText
+            progressValue = 0.6
+            
+            // Step 2: Summarize transcript
+            print("🔊 Step 2: Summarizing transcript...")
+            let summarizationResponse = try await apiService.summarizeTranscript(transcript: transcriptText)
+            progressValue = 0.9
+            
+            print("🔊 Summarization response received: \(summarizationResponse)")
+            
+            // Step 3: Create VisitSummary
+            let medicationActionStrings = (summarizationResponse.medicationActions ?? []).map { $0.action.rawValue }
+            
+            self.visitSummary = VisitSummary(
+                summary: summarizationResponse.summary ?? "",
+                tldr: summarizationResponse.tldr ?? "",
+                specialty: summarizationResponse.specialty ?? "General",
+                date: summarizationResponse.date ?? "TODAY",
+                medications: summarizationResponse.medications ?? [],
+                medicationActions: medicationActionStrings,
+                chronicConditions: summarizationResponse.chronicConditions ?? []
+            )
+            
+            print("🔊 Visit summary created: \(self.visitSummary?.summary ?? "No summary")")
+            
+            progressValue = 1.0
+            currentStep = .reviewing
+            
+        } catch {
+            print("❌ Error during audio processing: \(error)")
+            errorMessage = error.localizedDescription
+            currentStep = .ready
         }
+        
+        isLoading = false
+    }
+    
+    func resetRecording() {
+        progressValue = 0.0
+        currentStep = .ready
+        visitSummary = nil
+        transcript = "" // Reset transcript
+        showingSuccess = false
+        errorMessage = nil
+        isLoading = false
+    }
 }

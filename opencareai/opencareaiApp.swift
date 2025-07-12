@@ -3,24 +3,27 @@ import SwiftUI
 import Firebase
 
 @main
-struct opencareaiApp: App {
+struct opencareai: App {
     // Register app delegate for Firebase setup
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     
     // The AuthViewModel will be the single source of truth for authentication state
     @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var appState = AppState()
 
     var body: some Scene {
         WindowGroup {
-            // Show AuthenticationView if the user is not logged in,
-            // otherwise show the main ContentView.
-            if authViewModel.userSession == nil {
-                AuthenticationView()
-                    .environmentObject(authViewModel)
-            } else {
-                ContentView()
-                    .environmentObject(authViewModel)
+            Group {
+                if authViewModel.userSession == nil {
+                    AuthenticationView()
+                        .environmentObject(authViewModel)
+                } else {
+                    ContentView()
+                        .environmentObject(authViewModel)
+                        .environmentObject(appState)
+                }
             }
+            .preferredColorScheme(.light) // Default to light mode like web app
         }
     }
 }

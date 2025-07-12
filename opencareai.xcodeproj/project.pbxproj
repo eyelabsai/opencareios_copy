@@ -41,7 +41,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		63FAC82B2E11F70C00538180 /* Exceptions for "opencareai" folder in "opencareai" target */ = {
+		05E7B2442E22FFB60030E98B /* Exceptions for "opencareai" folder in "opencareai" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -54,7 +54,7 @@
 		63FAC7E62E11A74400538180 /* opencareai */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				63FAC82B2E11F70C00538180 /* Exceptions for "opencareai" folder in "opencareai" target */,
+				05E7B2442E22FFB60030E98B /* Exceptions for "opencareai" folder in "opencareai" target */,
 			);
 			path = opencareai;
 			sourceTree = "<group>";

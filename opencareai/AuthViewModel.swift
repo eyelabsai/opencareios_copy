@@ -6,6 +6,7 @@ import FirebaseAuth
 class AuthViewModel: ObservableObject {
     @Published var userSession: FirebaseAuth.User?
     @Published var errorMessage: String?
+    @Published var isLoading: Bool = false
 
     init() {
         userSession = Auth.auth().currentUser
@@ -14,43 +15,76 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    func signIn(withEmail email: String, password: String) {
-        Auth.auth().signIn(withEmail: email, password: password) { [weak self] _, error in
-            if let error = error {
-                self?.errorMessage = error.localizedDescription
-            } else {
-                self?.errorMessage = nil
-            }
+    func signIn(withEmail email: String, password: String) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await Auth.auth().signIn(withEmail: email, password: password)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
+        
+        isLoading = false
     }
 
-    func createUser(withEmail email: String, password: String) {
-        Auth.auth().createUser(withEmail: email, password: password) { [weak self] result, error in
-            if let error = error {
-                self?.errorMessage = error.localizedDescription
-                return
-            }
+    func createUser(
+        withEmail email: String,
+        password: String,
+        firstName: String,
+        lastName: String,
+        dob: String,
+        gender: String,
+        phoneNumber: String,
+        street: String,
+        city: String,
+        state: String,
+        zip: String,
+        insuranceProvider: String,
+        insuranceMemberId: String,
+        allergies: String,
+        chronicConditions: String,
+        heightFeet: String,
+        heightInches: String,
+        weight: String
+    ) async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            // Convert string allergies and chronicConditions to arrays
+            let allergiesArray = allergies.isEmpty ? [] : allergies.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            let chronicConditionsArray = chronicConditions.isEmpty ? [] : chronicConditions.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             
-            guard let user = result?.user else {
-                self?.errorMessage = "Failed to get user data after creation."
-                return
-            }
-            
-            // Create a profile for the new user in Firestore
-            var newUser = User(email: email, name: "", chronicConditions: [])
-            newUser.id = user.uid // Assign the id after initialization
-            
-            FirebaseService.shared.updateUserProfile(userProfile: newUser) { error in
-                if let error = error {
-                    // If creating the profile fails, show the error
-                    self?.errorMessage = "Failed to create user profile: \(error.localizedDescription)"
-                    // Optional: You might want to delete the created auth user here
-                    // user.delete { _ in }
-                } else {
-                    // This part is successful, so no error message.
-                    // The state change will automatically dismiss the auth view.
-                    self?.errorMessage = nil
-                }
+            let newUser = User(
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+                dob: dob,
+                gender: gender,
+                phoneNumber: phoneNumber,
+                street: street,
+                city: city,
+                state: state,
+                zip: zip,
+                insuranceProvider: insuranceProvider,
+                insuranceMemberId: insuranceMemberId,
+                allergies: allergiesArray,
+                chronicConditions: chronicConditionsArray,
+                heightFeet: heightFeet,
+                heightInches: heightInches,
+                weight: weight
+            )
+            try await OpenCareFirebaseService.shared.signUp(email: email, password: password, userData: newUser)
+            isLoading = false
+        } catch {
+            isLoading = false
+            errorMessage = "Registration failed: \(error.localizedDescription)"
+            print("[Registration Error] \(error)")
+            // Fallback: Prompt user to re-enter profile info if Firestore save failed
+            if (error.localizedDescription.contains("user not found") || error.localizedDescription.contains("missing")) {
+                errorMessage = "Profile creation failed. Please re-enter your information."
+                // Optionally, trigger a UI state to show the profile form again
             }
         }
     }
@@ -58,6 +92,7 @@ class AuthViewModel: ObservableObject {
     func signOut() {
         do {
             try Auth.auth().signOut()
+            errorMessage = nil
         } catch {
             self.errorMessage = "Failed to sign out: \(error.localizedDescription)"
         }
