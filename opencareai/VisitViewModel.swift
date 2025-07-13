@@ -13,6 +13,7 @@ class VisitViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var transcript: String = "" // Add transcript property to match web app
     @Published var visits: [Visit] = [] // Add visits property back
+    @Published var medicationViewModel = MedicationViewModel() // Add this property
     
     private let apiService = APIService.shared
     private let firebaseService = OpenCareFirebaseService.shared
@@ -95,6 +96,12 @@ class VisitViewModel: ObservableObject {
         
         do {
             try await firebaseService.createVisit(visit, userId: userId)
+            // Add all medications from the visit to the user's global medications collection
+            if let meds = visit.medications {
+                for med in meds {
+                    await medicationViewModel.createMedication(med)
+                }
+            }
             await loadVisitsAsync() // Reload visits after creation
         } catch {
             errorMessage = error.localizedDescription
@@ -155,6 +162,13 @@ class VisitViewModel: ObservableObject {
             
             // Save to Firebase
             try await firebaseService.createVisit(newVisit, userId: userId)
+            
+            // Add all medications from the visit to the user's global medications collection
+            if let meds = newVisit.medications {
+                for med in meds {
+                    await medicationViewModel.createMedication(med)
+                }
+            }
             
             // Reload visits
             await loadVisitsAsync()
@@ -297,17 +311,18 @@ class VisitViewModel: ObservableObject {
         guard !transcript.isEmpty else { return }
         
         do {
-            let summaryResponse = try await apiService.summarizeTranscript(transcript: transcript)
+            // Use enhanced summarization with verification (matching web app functionality)
+            let (summaryResponse, medications, actions) = try await apiService.summarizeTranscriptWithVerification(transcript)
             
             // Convert MedicationAction array to [String] of action raw values
-            let medicationActionStrings: [String] = (summaryResponse.medicationActions ?? []).map { $0.action.rawValue }
+            let medicationActionStrings: [String] = actions.map { $0.action.rawValue }
             
             let visitSummary = VisitSummary(
                 summary: summaryResponse.summary ?? "",
                 tldr: summaryResponse.tldr ?? "",
                 specialty: summaryResponse.specialty ?? "",
                 date: summaryResponse.date ?? "",
-                medications: summaryResponse.medications ?? [],
+                medications: medications,
                 medicationActions: medicationActionStrings,
                 chronicConditions: summaryResponse.chronicConditions ?? []
             )
@@ -371,7 +386,7 @@ class VisitViewModel: ObservableObject {
     // MARK: - Process Audio Recording
     @MainActor
     func processAudioRecording(_ audioData: Data) async {
-        guard Auth.auth().currentUser?.uid != nil else {
+        guard let userId = Auth.auth().currentUser?.uid else {
             errorMessage = "User not authenticated"
             return
         }
@@ -403,13 +418,13 @@ class VisitViewModel: ObservableObject {
             
             // Step 2: Summarize transcript
             print("🔊 Step 2: Summarizing transcript...")
-            let summarizationResponse = try await apiService.summarizeTranscript(transcript: transcriptText)
+            let (summarizationResponse, medications, actions) = try await apiService.summarizeTranscriptWithVerification(transcriptText)
             progressValue = 0.9
             
             print("🔊 Summarization response received: \(summarizationResponse)")
             
             // Step 3: Create VisitSummary
-            let medicationActionStrings = (summarizationResponse.medicationActions ?? []).map { $0.action.rawValue }
+            let medicationActionStrings = actions.map { $0.action.rawValue }
             
             self.visitSummary = VisitSummary(
                 summary: summarizationResponse.summary ?? "",
@@ -423,8 +438,36 @@ class VisitViewModel: ObservableObject {
             
             print("🔊 Visit summary created: \(self.visitSummary?.summary ?? "No summary")")
             
+            // Step 4: Create Visit and save to Firebase
+            print("🔊 Step 4: Creating visit in Firebase...")
+            let visit = Visit(
+                userId: userId,
+                date: Date(),
+                specialty: summarizationResponse.specialty ?? "General",
+                summary: summarizationResponse.summary ?? "",
+                tldr: summarizationResponse.tldr ?? "",
+                medications: summarizationResponse.medications ?? [],
+                medicationActions: nil, // Not available from summary
+                chronicConditions: summarizationResponse.chronicConditions ?? [],
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            
+            try await firebaseService.createVisit(visit, userId: userId)
+            
+            // Step 5: Add all medications to global medications collection
+            print("🔊 Step 5: Adding medications to global collection...")
+            let meds = summarizationResponse.medications
+            for med in meds {
+                await medicationViewModel.createMedication(med)
+            }
+            
+            // Step 6: Reload visits
+            await loadVisitsAsync()
+            
             progressValue = 1.0
-            currentStep = .reviewing
+            currentStep = .completed
+            showingSuccess = true
             
         } catch {
             print("❌ Error during audio processing: \(error)")

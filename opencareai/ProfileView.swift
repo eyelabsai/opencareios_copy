@@ -12,6 +12,7 @@ import SwiftUI
 struct ProfileView: View {
     @StateObject private var viewModel = UserViewModel()
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var appState: AppState
     @State private var showingAddCondition = false
     @State private var newCondition = ""
     
@@ -38,6 +39,8 @@ struct ProfileView: View {
                     emergencySection
                     // Health
                     healthSection
+                    // Appearance
+                    appearanceSection
                     // Chronic Conditions
                     chronicConditionsSection
                     // Account Actions
@@ -257,6 +260,30 @@ struct ProfileView: View {
                     ForEach(bloodTypeOptions, id: \.self) { Text($0) }
                 }
                 .pickerStyle(MenuPickerStyle())
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(radius: 2)
+    }
+    
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Appearance")
+                .font(.headline)
+                .fontWeight(.semibold)
+            VStack(spacing: 12) {
+                Picker("Theme", selection: $appState.colorScheme) {
+                    ForEach(ColorSchemeOption.allCases, id: \.self) { scheme in
+                        Text(scheme.displayName).tag(scheme)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+                
+                Text("Choose your preferred app appearance")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()

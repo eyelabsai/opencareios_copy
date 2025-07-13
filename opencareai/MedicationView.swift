@@ -10,7 +10,7 @@ import SwiftUI
 
 // MARK: - Medication List
 struct MedicationView: View {
-    @StateObject private var viewModel = MedicationViewModel()
+    @EnvironmentObject var medicationViewModel: MedicationViewModel
     @StateObject private var scheduler = MedicationScheduler()
     
     @State private var searchText          = ""
@@ -19,7 +19,7 @@ struct MedicationView: View {
     @State private var showingDetailSheet  = false
     
     private var displayedMedications: [Medication] {
-        let filtered = viewModel.filteredMedications
+        let filtered = medicationViewModel.filteredMedications
         guard !searchText.isEmpty else { return filtered }
         return filtered.filter { medication in
             medication.name.localizedCaseInsensitiveContains(searchText) ||
@@ -41,7 +41,7 @@ struct MedicationView: View {
                     HStack {
                         Button {
                             showingActiveOnly.toggle()
-                            viewModel.filterType = showingActiveOnly ? .active : .all
+                            medicationViewModel.filterType = showingActiveOnly ? .active : .all
                         } label: {
                             HStack {
                                 Image(systemName: showingActiveOnly ? "checkmark.circle.fill" : "circle")
@@ -60,7 +60,7 @@ struct MedicationView: View {
                 .padding(.horizontal)
                 
                 // ───── List ─────
-                if viewModel.isLoading {
+                if medicationViewModel.isLoading {
                     Spacer(); ProgressView("Loading medications…"); Spacer()
                 } else if displayedMedications.isEmpty {
                     Spacer()
@@ -76,6 +76,7 @@ struct MedicationView: View {
                     List(displayedMedications) { med in
                         MedicationRowView(medication: med, scheduler: scheduler)
                             .onTapGesture {
+                                print("[DEBUG] Medication tapped: \(med)") // Debug print
                                 selectedMedication = med
                                 showingDetailSheet = true
                             }
@@ -83,20 +84,20 @@ struct MedicationView: View {
                                 if med.isActive ?? true {
                                     Button("Discontinue", role: .destructive) {
                                         Task {
-                                            await viewModel.discontinueMedication(med)
+                                            await medicationViewModel.discontinueMedication(med)
                                         }
                                     }
                                 } else {
                                     Button("Reactivate") {
                                         Task {
-                                            await viewModel.reactivateMedication(med)
+                                            await medicationViewModel.reactivateMedication(med)
                                         }
                                     }
                                     .tint(.green)
                                 }
                                 Button("Delete", role: .destructive) {
                                     Task {
-                                        await viewModel.deleteMedication(med)
+                                        await medicationViewModel.deleteMedication(med)
                                     }
                                 }
                             }
@@ -108,11 +109,11 @@ struct MedicationView: View {
             .navigationBarTitleDisplayMode(.large)
             .onAppear { 
                 Task {
-                    await viewModel.loadMedicationsAsync()
+                    await medicationViewModel.loadMedicationsAsync()
                 }
             }
             .refreshable { 
-                await viewModel.loadMedicationsAsync()
+                await medicationViewModel.loadMedicationsAsync()
             }
             .sheet(isPresented: $showingDetailSheet) {
                 if let med = selectedMedication {
@@ -216,70 +217,82 @@ struct MedicationDetailView: View {
     let scheduler: MedicationScheduler
     @Environment(\.dismiss) private var dismiss
     
+    var allFieldsEmpty: Bool {
+        let emptyOrNotSpecified: (String?) -> Bool = { $0 == nil || $0 == "" || $0 == "Not specified" }
+        return emptyOrNotSpecified(medication.name) &&
+               emptyOrNotSpecified(medication.dosage) &&
+               emptyOrNotSpecified(medication.frequency) &&
+               emptyOrNotSpecified(medication.fullInstructions)
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(medication.name).font(.largeTitle).fontWeight(.bold)
-                            Spacer()
-                            if !(medication.isActive ?? true) {
-                                Text("DISCONTINUED")
-                                    .font(.caption).fontWeight(.bold).foregroundColor(.white)
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(Color.red).cornerRadius(4)
-                            }
+                    if allFieldsEmpty {
+                        VStack(spacing: 24) {
+                            Image(systemName: "pills").font(.system(size: 60)).foregroundColor(.gray)
+                            Text("No details available for this medication.").font(.title3).foregroundColor(.secondary)
                         }
-                        Text("Dosage: \(medication.dosage)")
-                            .font(.title3).foregroundColor(.secondary)
-                    }
-                    
-                    // Smart Schedule
-                    if let schedule = scheduler.processUniversalMedication(medication: medication) {
-                        SmartScheduleDetailView(schedule: schedule, scheduler: scheduler)
-                    }
-                    
-                    // Basic info
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Basic Information").font(.headline).fontWeight(.semibold)
-                        InfoRow(label: "Frequency",   value: medication.frequency)
-                        if let timing = medication.timing     { InfoRow(label: "Timing",     value: timing) }
-                        if let route  = medication.route      { InfoRow(label: "Route",      value: route) }
-                        if let lat    = medication.laterality { InfoRow(label: "Laterality", value: lat) }
-                        if let dur    = medication.duration   { InfoRow(label: "Duration",   value: dur) }
-                    }
-                    .padding().background(Color(.systemGray6)).cornerRadius(12)
-                    
-                    // Instructions
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Instructions").font(.headline).fontWeight(.semibold)
-                        Text(medication.fullInstructions ?? "No instructions available").font(.body).lineSpacing(4)
-                    }
-                    .padding().background(Color.blue.opacity(0.1)).cornerRadius(12)
-                    
-                    // Discontinued info
-                    if !(medication.isActive ?? true) {
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        // Header
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(medication.name).font(.largeTitle).fontWeight(.bold)
+                                Spacer()
+                                if !(medication.isActive ?? true) {
+                                    Text("DISCONTINUED")
+                                        .font(.caption).fontWeight(.bold).foregroundColor(.white)
+                                        .padding(.horizontal, 8).padding(.vertical, 4)
+                                        .background(Color.red).cornerRadius(4)
+                                }
+                            }
+                            Text("Dosage: \(medication.dosage)")
+                                .font(.title3).foregroundColor(.secondary)
+                        }
+                        // Smart Schedule
+                        if let schedule = scheduler.processUniversalMedication(medication: medication) {
+                            SmartScheduleDetailView(schedule: schedule, scheduler: scheduler)
+                        }
+                        // Basic info
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Discontinuation").font(.headline).fontWeight(.semibold)
-                            if let reason = medication.discontinuationReason {
-                                Text("Reason: \(reason)").font(.body)
-                            }
-                            if let date = medication.discontinuedDate {
-                                Text("Date: \(format(date))").font(.body).foregroundColor(.secondary)
-                            }
+                            Text("Basic Information").font(.headline).fontWeight(.semibold)
+                            InfoRow(label: "Frequency",   value: medication.frequency)
+                            if let timing = medication.timing     { InfoRow(label: "Timing",     value: timing) }
+                            if let route  = medication.route      { InfoRow(label: "Route",      value: route) }
+                            if let lat    = medication.laterality { InfoRow(label: "Laterality", value: lat) }
+                            if let dur    = medication.duration   { InfoRow(label: "Duration",   value: dur) }
                         }
-                        .padding().background(Color.red.opacity(0.1)).cornerRadius(12)
+                        .padding().background(Color(.systemGray6)).cornerRadius(12)
+                        // Instructions
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Instructions").font(.headline).fontWeight(.semibold)
+                            Text(medication.fullInstructions ?? "No instructions available").font(.body).lineSpacing(4)
+                        }
+                        .padding().background(Color.blue.opacity(0.1)).cornerRadius(12)
+                        // Discontinued info
+                        if !(medication.isActive ?? true) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Discontinuation").font(.headline).fontWeight(.semibold)
+                                if let reason = medication.discontinuationReason {
+                                    Text("Reason: \(reason)").font(.body)
+                                }
+                                if let date = medication.discontinuedDate {
+                                    Text("Date: \(format(date))").font(.body).foregroundColor(.secondary)
+                                }
+                            }
+                            .padding().background(Color.red.opacity(0.1)).cornerRadius(12)
+                        }
                     }
                 }
                 .padding()
+                .navigationTitle("Medication Details")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                } }
             }
-            .navigationTitle("Medication Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") { dismiss() }
-            } }
         }
     }
     

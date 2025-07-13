@@ -143,7 +143,7 @@ class OpenCareFirebaseService: ObservableObject {
         }
         // Convert Medication objects to Firestore-compatible dictionaries
         let medicationsDict = (newVisit.medications ?? []).map { med in
-            var dict: [String: Any] = [
+        var dict: [String: Any] = [
                 "id": med.id as Any,
                 "userId": med.userId as Any,
                 "name": med.name,
@@ -200,7 +200,32 @@ class OpenCareFirebaseService: ObservableObject {
             visit.specialty = data["specialty"] as? String ?? ""
             visit.summary = data["summary"] as? String ?? ""
             visit.tldr = data["tldr"] as? String ?? ""
-            visit.medications = data["medications"] as? [Medication] ?? []
+            // Fix: Decode medications from array of dictionaries
+            if let medicationsData = data["medications"] as? [[String: Any]] {
+                let medications = medicationsData.compactMap { medData -> Medication? in
+                    Medication(
+                        id: medData["id"] as? String,
+                        userId: medData["userId"] as? String,
+                        name: medData["name"] as? String ?? "",
+                        dosage: medData["dosage"] as? String ?? "",
+                        frequency: medData["frequency"] as? String ?? "",
+                        timing: medData["timing"] as? String,
+                        route: medData["route"] as? String,
+                        laterality: medData["laterality"] as? String,
+                        duration: medData["duration"] as? String,
+                        instructions: medData["instructions"] as? String,
+                        fullInstructions: medData["fullInstructions"] as? String,
+                        isActive: medData["isActive"] as? Bool,
+                        discontinuationReason: medData["discontinuationReason"] as? String,
+                        createdAt: (medData["createdAt"] as? Timestamp)?.dateValue(),
+                        updatedAt: (medData["updatedAt"] as? Timestamp)?.dateValue(),
+                        discontinuedDate: (medData["discontinuedDate"] as? Timestamp)?.dateValue()
+                    )
+                }
+                visit.medications = medications
+            } else {
+                visit.medications = []
+            }
             
             // Reconstruct MedicationAction objects from Firestore data
             let medicationActionsData = data["medicationActions"] as? [[String: Any]] ?? []
@@ -258,7 +283,32 @@ class OpenCareFirebaseService: ObservableObject {
         visit.specialty = data["specialty"] as? String ?? ""
         visit.summary = data["summary"] as? String ?? ""
         visit.tldr = data["tldr"] as? String ?? ""
-        visit.medications = data["medications"] as? [Medication] ?? []
+        // Fix: Decode medications from array of dictionaries
+        if let medicationsData = data["medications"] as? [[String: Any]] {
+            let medications = medicationsData.compactMap { medData -> Medication? in
+                Medication(
+                    id: medData["id"] as? String,
+                    userId: medData["userId"] as? String,
+                    name: medData["name"] as? String ?? "",
+                    dosage: medData["dosage"] as? String ?? "",
+                    frequency: medData["frequency"] as? String ?? "",
+                    timing: medData["timing"] as? String,
+                    route: medData["route"] as? String,
+                    laterality: medData["laterality"] as? String,
+                    duration: medData["duration"] as? String,
+                    instructions: medData["instructions"] as? String,
+                    fullInstructions: medData["fullInstructions"] as? String,
+                    isActive: medData["isActive"] as? Bool,
+                    discontinuationReason: medData["discontinuationReason"] as? String,
+                    createdAt: (medData["createdAt"] as? Timestamp)?.dateValue(),
+                    updatedAt: (medData["updatedAt"] as? Timestamp)?.dateValue(),
+                    discontinuedDate: (medData["discontinuedDate"] as? Timestamp)?.dateValue()
+                )
+            }
+            visit.medications = medications
+        } else {
+            visit.medications = []
+        }
         
         // Reconstruct MedicationAction objects from Firestore data
         let medicationActionsData = data["medicationActions"] as? [[String: Any]] ?? []
@@ -579,8 +629,8 @@ class OpenCareFirebaseService: ObservableObject {
             // Convert Timestamps to Dates
             if let createdAtTimestamp = data["createdAt"] as? Timestamp {
                 action.createdAt = createdAtTimestamp.dateValue()
-            }
-            
+    }
+    
             return action
         }
     }

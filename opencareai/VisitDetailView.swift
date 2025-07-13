@@ -7,124 +7,25 @@ struct VisitDetailView: View {
     
     @State private var showingDeleteAlert = false
     @State private var showingEditSheet = false
+    @State private var showingHealthAssistant = false
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Visit Header
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(visit.specialty ?? "Unknown Specialty")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.primary)
-                                
-                                Text(visit.formattedDate)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: { showingEditSheet = true }) {
-                                Image(systemName: "pencil.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        
-                        if visit.medicationsCount > 0 {
-                            HStack {
-                                Image(systemName: "pills")
-                                    .foregroundColor(.blue)
-                                Text("\(visit.medicationsCount) medication(s)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+                VStack(spacing: 24) {
+                    VisitHeaderView(visit: visit, showingHealthAssistant: $showingHealthAssistant, showingEditSheet: $showingEditSheet)
                     
-                    // Visit Summary
-                    if let summary = visit.summary, !summary.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Visit Summary")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            
-                            Text(summary)
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .lineLimit(nil)
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                    }
+                    VisitContentView(visit: visit)
                     
-                    // Quick Summary (TL;DR)
-                    if let tldr = visit.tldr, !tldr.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Quick Summary")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            
-                            Text(tldr)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding()
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(12)
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                    }
-                    
-                    // Medications
-                    if let medications = visit.medications, !medications.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Medications")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            
-                            LazyVStack(spacing: 8) {
-                                ForEach(medications) { medication in
-                                    MedicationItem(
-                                        medication: medication,
-                                        onTap: { },
-                                        onDelete: { }
-                                    )
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
-                    }
-                    
-                    // Actions
-                    VStack(spacing: 12) {
-                        PrimaryButton("Share Visit Summary") {
-                            shareVisitSummary()
-                        }
-                        
-                        SecondaryButton(title: "Export to PDF") {
-                            exportToPDF()
-                        }
-                    }
-                    .padding()
+                    VisitActionButtonsView(
+                        shareVisitSummary: shareVisitSummary,
+                        exportToPDF: exportToPDF,
+                        showingHealthAssistant: $showingHealthAssistant
+                    )
                 }
-                .padding()
+                .padding(20)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Visit Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -146,6 +47,10 @@ struct VisitDetailView: View {
             }
             .sheet(isPresented: $showingEditSheet) {
                 EditVisitView(visit: visit)
+                    .environmentObject(visitViewModel)
+            }
+            .sheet(isPresented: $showingHealthAssistant) {
+                HealthAssistantView()
                     .environmentObject(visitViewModel)
             }
         }
@@ -182,6 +87,100 @@ struct VisitDetailView: View {
     private func exportToPDF() {
         // PDF export functionality would be implemented here
         // For now, just show a placeholder
+    }
+}
+
+// MARK: - Meta Data Item Component
+struct MetaDataItem: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+            
+            Text(value)
+                .font(.body)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+        }
+    }
+}
+
+// MARK: - Enhanced Medication Item
+struct EnhancedMedicationItem: View {
+    let medication: Medication
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(medication.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                // Medication status label
+                if medication.isActive ?? true {
+                    Text("Active")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(12)
+                } else {
+                    Text("Inactive")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(12)
+                }
+                // Dosage, frequency, timing, etc.
+                VStack(alignment: .leading, spacing: 2) {
+                    if !medication.dosage.isEmpty && medication.dosage != "Not specified" {
+                        Text("Dosage: \(medication.dosage)")
+                    }
+                    if !medication.frequency.isEmpty && medication.frequency != "Not specified" {
+                        Text("Frequency: \(medication.frequency)")
+                    }
+                    if let timing = medication.timing, !timing.isEmpty && timing != "Not specified" {
+                        Text("Timing: \(timing)")
+                    }
+                    if let route = medication.route, !route.isEmpty && route != "Not specified" {
+                        Text("Route: \(route)")
+                    }
+                    if let laterality = medication.laterality, !laterality.isEmpty && laterality != "Not specified" {
+                        Text("Laterality: \(laterality)")
+                    }
+                    if let duration = medication.duration, !duration.isEmpty && duration != "Not specified" {
+                        Text("Duration: \(duration)")
+                    }
+                    if let instructions = medication.fullInstructions, !instructions.isEmpty && instructions != "Not specified" {
+                        Text(instructions)
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Text(medication.formattedInstructions)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
     }
 }
 
@@ -270,4 +269,258 @@ struct EditVisitView: View {
     
     VisitDetailView(visit: sampleVisit)
         .environmentObject(VisitViewModel())
+}
+
+// MARK: - Visit Header View
+struct VisitHeaderView: View {
+    let visit: Visit
+    @Binding var showingHealthAssistant: Bool
+    @Binding var showingEditSheet: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(visit.specialty ?? "Unknown Specialty")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.blue, Color.purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Text(visit.formattedDate)
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Button(action: { showingHealthAssistant = true }) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                            .padding(8)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
+                    Button(action: { showingEditSheet = true }) {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
+            
+            HStack(spacing: 20) {
+                if visit.medicationsCount > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "pills.fill")
+                            .foregroundColor(.blue)
+                        Text("\(visit.medicationsCount) medication(s)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(20)
+                }
+                
+                if let chronicConditions = visit.chronicConditions, !chronicConditions.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                        Text("\(chronicConditions.count) condition(s)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.red)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(20)
+                }
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
+// MARK: - Visit Content View
+struct VisitContentView: View {
+    let visit: Visit
+    
+    var body: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 20),
+            GridItem(.flexible(), spacing: 20)
+        ], spacing: 20) {
+            VisitMetaDataView(visit: visit)
+            VisitSummaryView(visit: visit)
+        }
+    }
+}
+
+// MARK: - Visit Meta Data View
+struct VisitMetaDataView: View {
+    let visit: Visit
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Visit Information")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    MetaDataItem(
+                        label: "Specialty",
+                        value: visit.specialty ?? "Not specified"
+                    )
+                    
+                    MetaDataItem(
+                        label: "Date",
+                        value: visit.formattedDate
+                    )
+                    
+                    if let medications = visit.medications, !medications.isEmpty {
+                        MetaDataItem(
+                            label: "Medications",
+                            value: "\(medications.count) prescribed"
+                        )
+                    }
+                    
+                    if let chronicConditions = visit.chronicConditions, !chronicConditions.isEmpty {
+                        MetaDataItem(
+                            label: "Conditions",
+                            value: "\(chronicConditions.count) noted"
+                        )
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+            )
+            
+            if let tldr = visit.tldr, !tldr.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Quick Summary")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Text(tldr)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.blue.opacity(0.1))
+                        )
+                }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Visit Summary View
+struct VisitSummaryView: View {
+    let visit: Visit
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if let summary = visit.summary, !summary.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Visit Summary")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Text(summary)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                )
+            }
+            
+            if let medications = visit.medications, !medications.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Medications")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    LazyVStack(spacing: 8) {
+                        ForEach(medications) { medication in
+                            EnhancedMedicationItem(medication: medication)
+                        }
+                    }
+                }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemBackground))
+                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Visit Action Buttons View
+struct VisitActionButtonsView: View {
+    let shareVisitSummary: () -> Void
+    let exportToPDF: () -> Void
+    @Binding var showingHealthAssistant: Bool
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            PrimaryButton("Share Visit Summary") {
+                shareVisitSummary()
+            }
+            
+            HStack(spacing: 12) {
+                SecondaryButton(title: "Export to PDF") {
+                    exportToPDF()
+                }
+                
+                SecondaryButton(title: "Health Assistant") {
+                    showingHealthAssistant = true
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        )
+    }
 }

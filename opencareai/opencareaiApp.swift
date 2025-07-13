@@ -23,7 +23,7 @@ struct opencareai: App {
                         .environmentObject(appState)
                 }
             }
-            .preferredColorScheme(.light) // Default to light mode like web app
+            .preferredColorScheme(appState.colorScheme == .system ? nil : (appState.colorScheme == .dark ? .dark : .light))
         }
     }
 }

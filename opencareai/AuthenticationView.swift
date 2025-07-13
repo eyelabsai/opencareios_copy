@@ -7,7 +7,7 @@ struct AuthenticationView: View {
     @State private var currentStep = 1
     @State private var totalSteps = 7
     
-    // Registration fields
+    // Registration fields (matching web app)
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var dob = Date()
@@ -29,7 +29,7 @@ struct AuthenticationView: View {
     @State private var password = ""
     @State private var confirmPassword = ""
     
-    // Options
+    // Options (matching web app)
     private let genderOptions = ["", "Male", "Female", "Other", "Prefer not to say"]
     private let insuranceOptions = ["", "Aetna", "Blue Cross", "Cigna", "UnitedHealthcare", "Kaiser", "None", "Other"]
     private let stateOptions = ["", "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
@@ -45,15 +45,28 @@ struct AuthenticationView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 30) {
-                    // Header
+                    // Header (matching web app styling)
                     VStack(spacing: 16) {
                         Image(systemName: "heart.text.square.fill")
                             .font(.system(size: 80))
-                            .foregroundColor(.blue)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                         
                         Text("OpenCare")
                             .font(.largeTitle)
                             .fontWeight(.bold)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.blue, Color.purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                         
                         Text("Your AI-Powered Health Assistant")
                             .font(.subheadline)
@@ -63,42 +76,65 @@ struct AuthenticationView: View {
                     .padding(.top, 50)
                     
                     if isSignUp {
-                        // Progress indicator
-                        VStack(spacing: 8) {
-                            ProgressView(value: Double(currentStep), total: Double(totalSteps))
-                                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                        // Enhanced progress indicator (matching web app)
+                        VStack(spacing: 12) {
+                            // Progress bar
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.blue.opacity(0.2))
+                                    .frame(height: 8)
+                                
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.blue, Color.purple],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: CGFloat(currentStep) / CGFloat(totalSteps) * UIScreen.main.bounds.width * 0.8, height: 8)
+                                    .animation(.easeInOut(duration: 0.3), value: currentStep)
+                            }
                             
                             Text("Step \(currentStep) of \(totalSteps)")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
+                                .foregroundColor(.blue)
                         }
                         .padding(.horizontal, 30)
                         
                         // Multi-step registration form
                         registrationForm
                     } else {
-                        // Simple login form
+                        // Enhanced login form (matching web app)
                         loginForm
                     }
                     
                     Spacer()
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background(
+                LinearGradient(
+                    colors: [Color(.systemGroupedBackground), Color.blue.opacity(0.1)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
             .navigationBarHidden(true)
         }
     }
     
     private var loginForm: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             // Email field
             VStack(alignment: .leading, spacing: 8) {
                 Text("Email")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
                 
                 TextField("Enter your email", text: $email)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textFieldStyle(EnhancedTextFieldStyle())
                     .focused($focusedField, equals: .email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
@@ -110,9 +146,10 @@ struct AuthenticationView: View {
                 Text("Password")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
                 
                 SecureField("Enter your password", text: $password)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textFieldStyle(EnhancedTextFieldStyle())
                     .focused($focusedField, equals: .password)
                     .textContentType(.password)
             }
@@ -127,7 +164,7 @@ struct AuthenticationView: View {
                     .cornerRadius(8)
             }
             
-            // Sign in button
+            // Enhanced sign in button (matching web app)
             Button(action: handleSignIn) {
                 HStack {
                     if viewModel.isLoading {
@@ -143,15 +180,20 @@ struct AuthenticationView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(isLoginFormValid ? Color.blue : Color.gray)
+                .background(
+                    isLoginFormValid ? 
+                    LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing) :
+                    LinearGradient(colors: [Color.gray, Color.gray], startPoint: .leading, endPoint: .trailing)
+                )
                 .foregroundColor(.white)
                 .cornerRadius(12)
+                .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
             }
             .disabled(!isLoginFormValid || viewModel.isLoading)
             
             // Toggle to sign up
             Button(action: {
-                withAnimation {
+                withAnimation(.easeInOut(duration: 0.3)) {
                     isSignUp.toggle()
                     clearForm()
                 }
@@ -159,6 +201,7 @@ struct AuthenticationView: View {
                 Text("Don't have an account? Sign Up")
                     .font(.subheadline)
                     .foregroundColor(.blue)
+                    .underline()
             }
         }
         .padding(.horizontal, 30)

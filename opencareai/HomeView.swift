@@ -12,35 +12,37 @@ import AVFoundation
 
 // MARK: - Main Home View
 struct HomeView: View {
-    @StateObject private var visitViewModel = VisitViewModel()
-    @StateObject private var audioRecorder = AudioRecorder()
-    @StateObject private var statsViewModel = StatsViewModel()
-    @EnvironmentObject var appState: AppState
-    
+    @EnvironmentObject var visitViewModel: VisitViewModel
+    @EnvironmentObject var statsViewModel: StatsViewModel
+    @EnvironmentObject var audioRecorder: AudioRecorder
+    @EnvironmentObject var medicationViewModel: MedicationViewModel
+    @Binding var selectedTab: Int
     @State private var showingNewVisit = false
     @State private var showingVisitDetail = false
+    @State private var showingHealthAssistant = false
+    @State private var showingMedicationDetail = false
     @State private var selectedVisit: Visit?
+    @State private var selectedMedication: Medication?
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 32) {
                     // Header with welcome message
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Welcome back!")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .foregroundColor(.primary)
-                        
                         Text("Ready to record your next medical visit?")
                             .font(.title3)
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    
-                    // Stats Grid - matching web app layout
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                    .padding(.horizontal, 24)
+
+                    // Stats Grid
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 2), spacing: 20) {
                         DashboardStatCard(
                             title: "Total Visits",
                             value: "\(visitViewModel.totalVisits)",
@@ -48,7 +50,6 @@ struct HomeView: View {
                             color: .blue,
                             gradient: LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
-                        
                         DashboardStatCard(
                             title: "This Month",
                             value: "\(visitViewModel.visitsThisMonth)",
@@ -56,7 +57,6 @@ struct HomeView: View {
                             color: .green,
                             gradient: LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
-                        
                         DashboardStatCard(
                             title: "Active Meds",
                             value: "\(statsViewModel.currentMedications.count)",
@@ -64,7 +64,6 @@ struct HomeView: View {
                             color: .orange,
                             gradient: LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
-                        
                         DashboardStatCard(
                             title: "Specialties",
                             value: "\(visitViewModel.visitsBySpecialty.keys.count)",
@@ -73,161 +72,154 @@ struct HomeView: View {
                             gradient: LinearGradient(colors: [.purple, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                     }
-                    .padding(.horizontal, 20)
-                    
-                    // Main Dashboard Layout - 2:1 grid like web app
-                    HStack(alignment: .top, spacing: 20) {
-                        // Main Content Column (2/3 width)
-                        VStack(spacing: 20) {
-                            // Quick Actions
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Quick Actions")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
-                                    QuickActionCard(
-                                        title: "Record Visit",
-                                        icon: "mic.fill",
-                                        color: .blue
-                                    ) {
-                                        showingNewVisit = true
-                                    }
-                                    
-                                    QuickActionCard(
-                                        title: "View History",
-                                        icon: "clock.fill",
-                                        color: .green
-                                    ) {
-                                        // This will be handled by the tab navigation
-                                    }
-                                    
-                                    QuickActionCard(
-                                        title: "Medications",
-                                        icon: "pills.fill",
-                                        color: .orange
-                                    ) {
-                                        // This will be handled by the tab navigation
-                                    }
-                                    
-                                    QuickActionCard(
-                                        title: "Health Assistant",
-                                        icon: "message.fill",
-                                        color: .purple
-                                    ) {
-                                        // This will be handled by the tab navigation
-                                    }
-                                }
+                    .padding(.horizontal, 24)
+
+                    // Quick Actions Section
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("Quick Actions")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .padding(.leading, 4)
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+                            QuickActionCard(
+                                title: "Record Visit",
+                                icon: "mic.fill",
+                                color: .blue
+                            ) { showingNewVisit = true }
+                            QuickActionCard(
+                                title: "View History",
+                                icon: "clock.fill",
+                                color: .green
+                            ) { 
+                                selectedTab = 1 // Navigate to History tab
                             }
-                            .padding(20)
-                            .background(Color(.systemBackground))
-                            .cornerRadius(12)
-                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                            
-                            // Recent Visits
-                            VStack(alignment: .leading, spacing: 16) {
-                                HStack {
-                                    Text("Recent Visits")
-                                        .font(.title2)
-                                        .fontWeight(.semibold)
-                                    
-                                    Spacer()
-                                    
-                                    Button("View All") {
-                                        // This will be handled by the tab navigation
-                                    }
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
-                                }
-                                
-                                if visitViewModel.isLoading {
-                                    LoadingView(message: "Loading visits...")
-                                        .frame(height: 200)
-                                } else if visitViewModel.recentVisits.isEmpty {
-                                    EmptyStateView(
-                                        icon: "calendar.badge.plus",
-                                        title: "No visits yet",
-                                        message: "Record your first medical visit to get started",
-                                        actionTitle: "Record Visit",
-                                        action: { showingNewVisit = true }
-                                    )
-                                    .frame(height: 200)
-                                } else {
-                                    LazyVStack(spacing: 12) {
-                                        ForEach(visitViewModel.recentVisits) { visit in
-                                            VisitItem(
-                                                visit: visit,
-                                                onTap: {
-                                                    selectedVisit = visit
-                                                    showingVisitDetail = true
-                                                },
-                                                onDelete: {
-                                                    visitViewModel.deleteVisit(visit)
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
+                            QuickActionCard(
+                                title: "Medications",
+                                icon: "pills.fill",
+                                color: .orange
+                            ) { 
+                                selectedTab = 2 // Navigate to Medications tab
                             }
-                            .padding(20)
-                            .background(Color(.systemBackground))
-                            .cornerRadius(12)
-                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            QuickActionCard(
+                                title: "Health Assistant",
+                                icon: "message.fill",
+                                color: .purple
+                            ) { 
+                                showingHealthAssistant = true // Navigate to Health Assistant
+                            }
                         }
-                        
-                        // Sidebar Column (1/3 width)
-                        VStack(spacing: 20) {
+                    }
+                    .padding(24)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(20)
+                    .shadow(color: .black.opacity(0.07), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal, 8)
+
+                    // Recent Visits Section
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack {
+                            Text("Recent Visits")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Button("View All") { 
+                                selectedTab = 1 // Navigate to History tab
+                            }
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
+                        if visitViewModel.isLoading {
+                            LoadingView(message: "Loading visits...")
+                                .frame(height: 200)
+                        } else if visitViewModel.recentVisits.isEmpty {
+                            EmptyStateView(
+                                icon: "calendar.badge.plus",
+                                title: "No visits yet",
+                                message: "Record your first medical visit to get started",
+                                actionTitle: "Record Visit",
+                                action: { showingNewVisit = true }
+                            )
+                            .frame(height: 200)
+                        } else {
+                            LazyVStack(spacing: 16) {
+                                ForEach(visitViewModel.recentVisits) { visit in
+                                    VisitItem(
+                                        visit: visit,
+                                        onTap: {
+                                            selectedVisit = visit
+                                            showingVisitDetail = true
+                                        },
+                                        onDelete: {
+                                            visitViewModel.deleteVisit(visit)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(20)
+                    .shadow(color: .black.opacity(0.07), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal, 8)
+
+                    // Sidebar: Active Medications & Health Summary
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 32) {
                             // Active Medications
-                            VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 20) {
                                 Text("Active Medications")
                                     .font(.title2)
                                     .fontWeight(.semibold)
-                                
                                 if statsViewModel.currentMedications.isEmpty {
                                     EmptyStateView(
                                         icon: "pills",
                                         title: "No active medications",
                                         message: "Your active medications will appear here",
                                         actionTitle: "Add Medication",
-                                        action: { /* Navigate to medication view */ }
+                                        action: { }
                                     )
                                     .frame(height: 150)
                                 } else {
-                                    LazyVStack(spacing: 8) {
+                                    LazyVStack(spacing: 12) {
                                         ForEach(statsViewModel.currentMedications.prefix(5)) { medication in
                                             MedicationItem(
                                                 medication: medication,
-                                                onTap: { },
-                                                onDelete: { }
+                                                onTap: { 
+                                                    selectedMedication = medication
+                                                    showingMedicationDetail = true
+                                                },
+                                                onDelete: { 
+                                                    Task {
+                                                        await medicationViewModel.deleteMedication(medication)
+                                                    }
+                                                }
                                             )
                                         }
                                     }
                                 }
                             }
-                            .padding(20)
+                            .frame(minWidth: 260, maxWidth: 320)
+                            .padding(24)
                             .background(Color(.systemBackground))
-                            .cornerRadius(12)
-                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                            
-                            // Quick Stats
-                            VStack(alignment: .leading, spacing: 16) {
+                            .cornerRadius(20)
+                            .shadow(color: .black.opacity(0.07), radius: 8, x: 0, y: 4)
+                            // Health Summary
+                            VStack(alignment: .leading, spacing: 20) {
                                 Text("Health Summary")
                                     .font(.title2)
                                     .fontWeight(.semibold)
-                                
-                                VStack(spacing: 12) {
+                                VStack(spacing: 16) {
                                     HealthSummaryItem(
                                         title: "Last Visit",
                                         value: visitViewModel.recentVisits.first?.formattedDate ?? "None",
                                         icon: "calendar"
                                     )
-                                    
                                     HealthSummaryItem(
                                         title: "Next Reminder",
                                         value: "Today",
                                         icon: "bell"
                                     )
-                                    
                                     HealthSummaryItem(
                                         title: "Health Score",
                                         value: "Good",
@@ -235,17 +227,18 @@ struct HomeView: View {
                                     )
                                 }
                             }
-                            .padding(20)
+                            .frame(minWidth: 260, maxWidth: 320)
+                            .padding(24)
                             .background(Color(.systemBackground))
-                            .cornerRadius(12)
-                            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            .cornerRadius(20)
+                            .shadow(color: .black.opacity(0.07), radius: 8, x: 0, y: 4)
                         }
-                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 8)
                     }
-                    .padding(.horizontal, 20)
                 }
-                .padding(.vertical, 20)
+                .padding(.vertical, 32)
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("OpenCare")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -266,6 +259,14 @@ struct HomeView: View {
                 if let visit = selectedVisit {
                     VisitDetailView(visit: visit)
                         .environmentObject(visitViewModel)
+                }
+            }
+            .sheet(isPresented: $showingHealthAssistant) {
+                HealthAssistantView()
+            }
+            .sheet(isPresented: $showingMedicationDetail) {
+                if let medication = selectedMedication {
+                    MedicationDetailView(medication: medication, scheduler: MedicationScheduler())
                 }
             }
             .onAppear {

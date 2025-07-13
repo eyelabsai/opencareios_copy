@@ -285,6 +285,8 @@ class AppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var selectedSpecialty: String = "All"
     @Published var selectedTimeframe: String = "All"
+    // Add dark mode preference
+    @Published var colorScheme: ColorSchemeOption = .system
     
     var activeMedications: [Medication] {
         medications.filter { $0.isCurrentlyActive }
@@ -369,6 +371,21 @@ class AppState: ObservableObject {
     
     func setError(_ message: String) {
         errorMessage = message
+    }
+}
+
+// Enum for color scheme preference
+enum ColorSchemeOption: String, CaseIterable, Codable {
+    case system
+    case light
+    case dark
+    
+    var displayName: String {
+        switch self {
+        case .system: return "System Default"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
     }
 }
 
