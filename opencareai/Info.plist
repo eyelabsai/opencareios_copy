@@ -2,14 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>We need access to your microphone to record your doctor visits for transcription and summarization.</string>
-	<key>ServerURL</key>
-	<string>https://opencare-gpt.vercel.app</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>ServerURL</key>
+	<string>https://opencare-gpt.vercel.app</string>
 </dict>
 </plist>
