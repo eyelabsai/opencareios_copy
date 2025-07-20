@@ -351,6 +351,94 @@ struct HealthSummaryItem: View {
 
 // MARK: - Medication Item (using the one from Components.swift)
 
+// MARK: - Medication Confirmation View
+struct MedicationConfirmationView: View {
+    @Binding var medications: [Medication]
+    var onConfirm: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Confirm Medications")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            if medications.isEmpty {
+                Text("No medications identified for this visit.")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(medications.indices, id: \.self) { idx in
+                    MedicationEditItem(medication: $medications[idx])
+                }
+                Button(action: {
+                    medications.append(Medication(name: "", dosage: "", frequency: ""))
+                }) {
+                    HStack {
+                        Image(systemName: "plus.circle")
+                        Text("Add Medication")
+                    }
+                }
+                .padding(.top, 8)
+            }
+            
+            Button("Confirm Medications") {
+                onConfirm()
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.blue)
+            .cornerRadius(8)
+        }
+        .padding(20)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+struct MedicationEditItem: View {
+    @Binding var medication: Medication
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                TextField("Name", text: $medication.name)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                TextField("Dosage", text: $medication.dosage)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                TextField("Frequency", text: $medication.frequency)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+            HStack {
+                TextField("Timing", text: Binding($medication.timing, replacingNilWith: ""))
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                TextField("Route", text: Binding($medication.route, replacingNilWith: ""))
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                TextField("Laterality", text: Binding($medication.laterality, replacingNilWith: ""))
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                TextField("Duration", text: Binding($medication.duration, replacingNilWith: ""))
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
+            TextField("Full Instructions", text: Binding($medication.fullInstructions, replacingNilWith: ""))
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+        }
+        .padding(8)
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+    }
+}
+
+// Helper to convert an optional String binding into a non-optional String binding
+extension Binding where Value == String {
+    init(_ source: Binding<String?>, replacingNilWith defaultValue: String) {
+        self.init(
+            get: { source.wrappedValue ?? defaultValue },
+            set: { source.wrappedValue = $0 }
+        )
+    }
+}
+
 // MARK: - New Visit View (Matching Web App)
 struct NewVisitView: View {
     @Environment(\.dismiss) private var dismiss
@@ -359,6 +447,8 @@ struct NewVisitView: View {
     
     @State private var showingPermissionAlert = false
     @State private var showingSuccessAlert = false
+    @State private var confirmingMedications = false
+    @State private var editableMedications: [Medication] = []
     
     var body: some View {
         NavigationView {
@@ -406,7 +496,28 @@ struct NewVisitView: View {
                 }
                 
                 if let summary = visitViewModel.visitSummary {
-                    newVisitSummarySection(summary: summary)
+                    if confirmingMedications {
+                        MedicationConfirmationView(medications: $editableMedications) {
+                            // On confirm, update summary and proceed to save
+                            visitViewModel.visitSummary?.medications = editableMedications
+                            confirmingMedications = false
+                        }
+                    } else {
+                        newVisitSummarySection(summary: summary)
+                        // If there are medications, show confirm button before save
+                        if (summary.medications.count > 0) {
+                            Button("Review & Confirm Medications") {
+                                editableMedications = summary.medications
+                                confirmingMedications = true
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                        }
+                    }
                 }
                 
                 Spacer(minLength: 100)
@@ -427,7 +538,7 @@ struct NewVisitView: View {
         }
         .alert(isPresented: Binding<Bool>(
             get: { visitViewModel.errorMessage != nil },
-            set: { newValue in if !newValue { visitViewModel.errorMessage = nil } }
+            set: { newValue in if (!newValue) { visitViewModel.errorMessage = nil } }
         )) {
             Alert(
                 title: Text("Error"),
