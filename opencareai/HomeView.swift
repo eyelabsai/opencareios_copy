@@ -449,38 +449,168 @@ struct NewVisitView: View {
     @State private var showingSuccessAlert = false
     @State private var confirmingMedications = false
     @State private var editableMedications: [Medication] = []
+    @State private var visitSaved = false
+    @State private var savedVisit: Visit?
+    @State private var showingVisitDetails = false
     
     var body: some View {
         NavigationView {
-            newVisitView
-            .alert("Microphone Permission Required", isPresented: $showingPermissionAlert) {
-                Button("Settings") {
-                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsUrl)
-                    }
-                }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("Please enable microphone access in Settings to record your medical visits.")
+            if visitSaved {
+                visitCompletionView
+            } else {
+                newVisitView
             }
-            .alert("Visit Saved!", isPresented: $showingSuccessAlert) {
-                Button("OK") {
+        }
+        .alert("Microphone Permission Required", isPresented: $showingPermissionAlert) {
+            Button("Settings") {
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Please enable microphone access in Settings to record your medical visits.")
+        }
+        .alert("Visit Saved!", isPresented: $showingSuccessAlert) {
+            Button("Continue") {
+                showingSuccessAlert = false
+                visitSaved = true
+            }
+        } message: {
+            Text("Your visit has been successfully recorded and saved.")
+        }
+        .sheet(isPresented: $showingVisitDetails) {
+            if let mostRecentVisit = visitViewModel.visits.first {
+                VisitDetailView(visit: mostRecentVisit)
+                    .environmentObject(visitViewModel)
+            }
+        }
+        .onChange(of: visitViewModel.showingSuccess) { _, success in
+            if success {
+                showingSuccessAlert = true
+            }
+        }
+        .onAppear {
+            // Reset state when view appears
+            visitViewModel.resetRecording()
+            audioRecorder.resetRecording()
+            visitSaved = false
+            savedVisit = nil
+            showingVisitDetails = false
+        }
+    }
+    
+    private var visitCompletionView: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Success Header
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.green)
+                    
+                    Text("Visit Completed!")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    
+                    Text("Your medical visit has been successfully recorded and saved.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Visit Summary Card
+                if let summary = visitViewModel.visitSummary {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Visit Summary")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            if !summary.specialty.isEmpty {
+                                HStack {
+                                    Text("Specialty:")
+                                        .fontWeight(.medium)
+                                    Text(summary.specialty)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                }
+                            }
+                            
+                            if !summary.tldr.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Quick Summary:")
+                                        .fontWeight(.medium)
+                                    Text(summary.tldr)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            if !summary.medications.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Medications (\(summary.medications.count)):")
+                                        .fontWeight(.medium)
+                                    ForEach(summary.medications.prefix(3)) { medication in
+                                        HStack {
+                                            Text("•")
+                                            Text(medication.name)
+                                            Spacer()
+                                        }
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    }
+                                    if summary.medications.count > 3 {
+                                        Text("... and \(summary.medications.count - 3) more")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+                }
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    Button("View Full Details") {
+                        showingVisitDetails = true
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+                    
+                    Button("Return to Home") {
+                        visitViewModel.resetRecording()
+                        audioRecorder.resetRecording()
+                        dismiss()
+                    }
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+            .padding(20)
+        }
+        .navigationTitle("Visit Complete")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
                     visitViewModel.resetRecording()
                     audioRecorder.resetRecording()
                     dismiss()
                 }
-            } message: {
-                Text("Your visit has been successfully recorded and saved.")
-            }
-            .onChange(of: visitViewModel.showingSuccess) { _, success in
-                if success {
-                    showingSuccessAlert = true
-                }
-            }
-            .onAppear {
-                // Reset state when view appears
-                visitViewModel.resetRecording()
-                audioRecorder.resetRecording()
             }
         }
     }

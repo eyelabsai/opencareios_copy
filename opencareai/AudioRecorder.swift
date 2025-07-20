@@ -70,7 +70,11 @@ class AudioRecorder: NSObject, ObservableObject {
             audioRecorder?.record()
             
             isRecording = true
+            recordingTime = 0
+            recordingStartTime = Date()
             errorMessage = nil
+            
+            startTimer()
             
             print("🎤 Recording started: \(audioFilename)")
         } catch {

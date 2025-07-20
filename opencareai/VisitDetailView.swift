@@ -12,7 +12,7 @@ struct VisitDetailView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 32) {
                     VisitHeaderView(visit: visit, showingHealthAssistant: $showingHealthAssistant, showingEditSheet: $showingEditSheet)
                     
                     VisitContentView(visit: visit)
@@ -96,7 +96,7 @@ struct MetaDataItem: View {
     let value: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.caption)
                 .fontWeight(.semibold)
@@ -364,10 +364,7 @@ struct VisitContentView: View {
     let visit: Visit
     
     var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 20),
-            GridItem(.flexible(), spacing: 20)
-        ], spacing: 20) {
+        VStack(spacing: 24) {
             VisitMetaDataView(visit: visit)
             VisitSummaryView(visit: visit)
         }
@@ -379,14 +376,14 @@ struct VisitMetaDataView: View {
     let visit: Visit
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 20) {
                 Text("Visit Information")
-                    .font(.headline)
+                    .font(.title2)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     MetaDataItem(
                         label: "Specialty",
                         value: visit.specialty ?? "Not specified"
@@ -412,31 +409,31 @@ struct VisitMetaDataView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(24)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16)
                     .fill(Color(.systemBackground))
                     .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
             )
             
             if let tldr = visit.tldr, !tldr.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("Quick Summary")
-                        .font(.headline)
+                        .font(.title2)
                         .fontWeight(.semibold)
                     
                     Text(tldr)
-                        .font(.subheadline)
+                        .font(.body)
                         .foregroundColor(.secondary)
-                        .padding(16)
+                        .padding(20)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.blue.opacity(0.1))
                         )
                 }
-                .padding(20)
+                .padding(24)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(Color(.systemBackground))
                         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                 )
@@ -450,11 +447,11 @@ struct VisitSummaryView: View {
     let visit: Visit
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
             if let summary = visit.summary, !summary.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("Visit Summary")
-                        .font(.headline)
+                        .font(.title2)
                         .fontWeight(.semibold)
                     
                     Text(summary)
@@ -463,29 +460,29 @@ struct VisitSummaryView: View {
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(20)
+                .padding(24)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(Color(.systemBackground))
                         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                 )
             }
             
             if let medications = visit.medications, !medications.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("Medications")
-                        .font(.headline)
+                        .font(.title2)
                         .fontWeight(.semibold)
                     
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 12) {
                         ForEach(medications) { medication in
                             EnhancedMedicationItem(medication: medication)
                         }
                     }
                 }
-                .padding(20)
+                .padding(24)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(Color(.systemBackground))
                         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                 )

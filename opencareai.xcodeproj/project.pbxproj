@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0540776E2E2D4DE100DF3F44 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0540776D2E2D4DE100DF3F44 /* README.md */; };
 		0540776F2E2D4DE100DF3F44 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0540776D2E2D4DE100DF3F44 /* README.md */; };
 		054077702E2D4DE100DF3F44 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0540776D2E2D4DE100DF3F44 /* README.md */; };
 		63D320012E17ABF700DE89B7 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320002E17ABF700DE89B7 /* FirebaseAuth */; };
@@ -261,7 +260,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0540776E2E2D4DE100DF3F44 /* README.md in Resources */,
 				63D3200D2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
