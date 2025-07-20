@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0540776E2E2D4DE100DF3F44 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0540776D2E2D4DE100DF3F44 /* README.md */; };
+		0540776F2E2D4DE100DF3F44 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0540776D2E2D4DE100DF3F44 /* README.md */; };
+		054077702E2D4DE100DF3F44 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 0540776D2E2D4DE100DF3F44 /* README.md */; };
 		63D320012E17ABF700DE89B7 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320002E17ABF700DE89B7 /* FirebaseAuth */; };
 		63D320032E17ABF700DE89B7 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320022E17ABF700DE89B7 /* FirebaseFirestore */; };
 		63D320052E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 63D320042E17ABF700DE89B7 /* FirebaseFirestoreCombine-Community */; };
@@ -34,6 +37,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0540776D2E2D4DE100DF3F44 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		63FAC7E42E11A74400538180 /* opencareai.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = opencareai.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		63FAC7F42E11A74600538180 /* opencareaiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = opencareaiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -110,6 +114,7 @@
 		63FAC7DB2E11A74400538180 = {
 			isa = PBXGroup;
 			children = (
+				0540776D2E2D4DE100DF3F44 /* README.md */,
 				63D3200A2E17B1C700DE89B7 /* GoogleService-Info.plist */,
 				63FAC7E62E11A74400538180 /* opencareai */,
 				63FAC7F72E11A74600538180 /* opencareaiTests */,
@@ -256,6 +261,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0540776E2E2D4DE100DF3F44 /* README.md in Resources */,
 				63D3200D2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -264,6 +270,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				054077702E2D4DE100DF3F44 /* README.md in Resources */,
 				63D3200C2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -272,6 +279,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0540776F2E2D4DE100DF3F44 /* README.md in Resources */,
 				63D3200B2E17B1C700DE89B7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
