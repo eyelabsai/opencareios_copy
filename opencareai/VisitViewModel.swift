@@ -383,7 +383,7 @@ class VisitViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Process Audio Recording
+    // MARK: - Process Audio Recording (without auto-saving)
     @MainActor
     func processAudioRecording(_ audioData: Data) async {
         guard let userId = Auth.auth().currentUser?.uid else {
@@ -423,7 +423,7 @@ class VisitViewModel: ObservableObject {
             
             print("🔊 Summarization response received: \(summarizationResponse)")
             
-            // Step 3: Create VisitSummary
+            // Step 3: Create VisitSummary (DO NOT SAVE YET)
             let medicationActionStrings = actions.map { $0.action.rawValue }
             
             self.visitSummary = VisitSummary(
@@ -438,41 +438,65 @@ class VisitViewModel: ObservableObject {
             
             print("🔊 Visit summary created: \(self.visitSummary?.summary ?? "No summary")")
             
-            // Step 4: Create Visit and save to Firebase
-            print("🔊 Step 4: Creating visit in Firebase...")
+            progressValue = 1.0
+            currentStep = .reviewing
+            
+        } catch {
+            print("❌ Error during audio processing: \(error)")
+            errorMessage = error.localizedDescription
+            currentStep = .ready
+        }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Save Visit (explicit save action)
+    @MainActor
+    func saveVisitFromSummary() async {
+        guard let summary = visitSummary else {
+            errorMessage = "No visit summary to save"
+            return
+        }
+        
+        guard let userId = Auth.auth().currentUser?.uid else {
+            errorMessage = "User not authenticated"
+            return
+        }
+        
+        isLoading = true
+        
+        do {
+            print("🔊 Saving visit to Firebase...")
             let visit = Visit(
                 userId: userId,
                 date: Date(),
-                specialty: summarizationResponse.specialty ?? "General",
-                summary: summarizationResponse.summary ?? "",
-                tldr: summarizationResponse.tldr ?? "",
-                medications: summarizationResponse.medications ?? [],
-                medicationActions: nil, // Not available from summary
-                chronicConditions: summarizationResponse.chronicConditions ?? [],
+                specialty: summary.specialty,
+                summary: summary.summary,
+                tldr: summary.tldr,
+                medications: summary.medications,
+                medicationActions: nil,
+                chronicConditions: summary.chronicConditions,
                 createdAt: Date(),
                 updatedAt: Date()
             )
             
             try await firebaseService.createVisit(visit, userId: userId)
             
-            // Step 5: Add all medications to global medications collection
-            print("🔊 Step 5: Adding medications to global collection...")
-            let meds = summarizationResponse.medications
-            for med in meds {
+            // Add medications to global collection
+            print("🔊 Adding medications to global collection...")
+            for med in summary.medications {
                 await medicationViewModel.createMedication(med)
             }
             
-            // Step 6: Reload visits
+            // Reload visits
             await loadVisitsAsync()
             
-            progressValue = 1.0
             currentStep = .completed
             showingSuccess = true
             
         } catch {
-            print("❌ Error during audio processing: \(error)")
+            print("❌ Error saving visit: \(error)")
             errorMessage = error.localizedDescription
-            currentStep = .ready
         }
         
         isLoading = false

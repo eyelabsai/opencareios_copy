@@ -480,8 +480,13 @@ struct NewVisitView: View {
             Text("Your visit has been successfully recorded and saved.")
         }
         .sheet(isPresented: $showingVisitDetails) {
-            if let mostRecentVisit = visitViewModel.visits.first {
+            if visitSaved, let mostRecentVisit = visitViewModel.visits.first {
+                // Show saved visit details
                 VisitDetailView(visit: mostRecentVisit)
+                    .environmentObject(visitViewModel)
+            } else if let summary = visitViewModel.visitSummary {
+                // Show unsaved visit details from summary
+                VisitDetailView(visit: createTempVisitFromSummary(summary))
                     .environmentObject(visitViewModel)
             }
         }
@@ -586,6 +591,18 @@ struct NewVisitView: View {
                     .background(Color.blue)
                     .cornerRadius(8)
                     
+                    Button("Record Another Visit") {
+                        visitViewModel.resetRecording()
+                        audioRecorder.resetRecording()
+                        visitSaved = false
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.green)
+                    .cornerRadius(8)
+                    
                     Button("Return to Home") {
                         visitViewModel.resetRecording()
                         audioRecorder.resetRecording()
@@ -628,25 +645,68 @@ struct NewVisitView: View {
                 if let summary = visitViewModel.visitSummary {
                     if confirmingMedications {
                         MedicationConfirmationView(medications: $editableMedications) {
-                            // On confirm, update summary and proceed to save
+                            // On confirm, update summary and proceed to save options
                             visitViewModel.visitSummary?.medications = editableMedications
                             confirmingMedications = false
                         }
                     } else {
                         newVisitSummarySection(summary: summary)
-                        // If there are medications, show confirm button before save
-                        if (summary.medications.count > 0) {
-                            Button("Review & Confirm Medications") {
-                                editableMedications = summary.medications
-                                confirmingMedications = true
+                        
+                        // Action buttons after summary
+                        VStack(spacing: 12) {
+                            // Medication confirmation button (if medications exist)
+                            if !summary.medications.isEmpty {
+                                Button("Review & Confirm Medications") {
+                                    editableMedications = summary.medications
+                                    confirmingMedications = true
+                                }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(8)
+                            }
+                            
+                            // Save visit button
+                            Button("Save Visit") {
+                                Task {
+                                    await saveVisit()
+                                }
                             }
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.blue)
+                            .background(Color.green)
+                            .cornerRadius(8)
+                            .disabled(visitViewModel.isLoading)
+                            
+                            // View Full Details button
+                            Button("View Full Details") {
+                                showingVisitDetails = true
+                            }
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
+                            
+                            // Cancel/Return without saving
+                            Button("Cancel & Return Home") {
+                                visitViewModel.resetRecording()
+                                audioRecorder.resetRecording()
+                                dismiss()
+                            }
+                            .font(.headline)
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.red.opacity(0.1))
                             .cornerRadius(8)
                         }
+                        .padding(.horizontal, 20)
                     }
                 }
                 
@@ -731,6 +791,12 @@ struct NewVisitView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.red)
+                        .onAppear {
+                            print("⏱️ Timer display appeared - recordingTime: \(audioRecorder.recordingTime)")
+                        }
+                        .onChange(of: audioRecorder.recordingTime) { _, newValue in
+                            print("⏱️ Timer display updated - new value: \(newValue)")
+                        }
                 }
                 
                 Spacer()
@@ -875,19 +941,6 @@ struct NewVisitView: View {
                 }
             }
             
-            // Save Visit Button
-            Button("Save Visit") {
-                Task {
-                    await saveVisit()
-                }
-            }
-            .font(.headline)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.green)
-            .cornerRadius(8)
-            .disabled(visitViewModel.isLoading)
         }
         .padding(20)
         .background(Color(.systemBackground))
@@ -939,6 +992,23 @@ struct NewVisitView: View {
         case .completed:
             return "Visit completed successfully!"
         }
+    }
+    
+    // MARK: - Helper Functions
+    private func createTempVisitFromSummary(_ summary: VisitSummary) -> Visit {
+        return Visit(
+            id: "temp-visit",
+            userId: nil,
+            date: Date(),
+            specialty: summary.specialty,
+            summary: summary.summary,
+            tldr: summary.tldr,
+            medications: summary.medications,
+            medicationActions: nil,
+            chronicConditions: summary.chronicConditions,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
     }
     
     // MARK: - Recording Methods
@@ -998,24 +1068,12 @@ struct NewVisitView: View {
     }
     
     private func saveVisit() async {
-        guard let summary = visitViewModel.visitSummary else { return }
-        
         await MainActor.run {
             visitViewModel.isLoading = true
         }
         
-        do {
-            // Use the VisitViewModel's save method
-            await visitViewModel.saveCurrentVisit()
-            await MainActor.run {
-                visitViewModel.showingSuccess = true
-            }
-            
-        } catch {
-            await MainActor.run {
-                visitViewModel.errorMessage = "Failed to save visit: \(error.localizedDescription)"
-            }
-        }
+        // Use the new explicit save method
+        await visitViewModel.saveVisitFromSummary()
         
         await MainActor.run {
             visitViewModel.isLoading = false

@@ -50,36 +50,42 @@ class AudioRecorder: NSObject, ObservableObject {
     
     func startRecording() async {
         guard await requestMicrophonePermission() else {
-            errorMessage = "Microphone permission is required to record visits"
+            await MainActor.run {
+                errorMessage = "Microphone permission is required to record visits"
+            }
             return
         }
         
-        do {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let audioFilename = documentsPath.appendingPathComponent("visit_recording_\(Date().timeIntervalSince1970).m4a")
-            
-            let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 44100.0,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-            ]
-            
-            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
-            audioRecorder?.delegate = self
-            audioRecorder?.record()
-            
-            isRecording = true
-            recordingTime = 0
-            recordingStartTime = Date()
-            errorMessage = nil
-            
-            startTimer()
-            
-            print("🎤 Recording started: \(audioFilename)")
-        } catch {
-            print("❌ Recording error: \(error)")
-            errorMessage = "Failed to start recording: \(error.localizedDescription)"
+        await MainActor.run {
+            do {
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let audioFilename = documentsPath.appendingPathComponent("visit_recording_\(Date().timeIntervalSince1970).m4a")
+                
+                let settings: [String: Any] = [
+                    AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                    AVSampleRateKey: 44100.0,
+                    AVNumberOfChannelsKey: 1,
+                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+                ]
+                
+                audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+                audioRecorder?.delegate = self
+                audioRecorder?.record()
+                
+                print("🎤 Audio recorder started successfully")
+                
+                isRecording = true
+                recordingTime = 0
+                recordingStartTime = Date()
+                errorMessage = nil
+                
+                startTimer()
+                
+                print("🎤 Recording started: \(audioFilename)")
+            } catch {
+                print("❌ Recording error: \(error)")
+                errorMessage = "Failed to start recording: \(error.localizedDescription)"
+            }
         }
     }
     
@@ -96,6 +102,7 @@ class AudioRecorder: NSObject, ObservableObject {
     }
     
     func stopRecording() -> Data? {
+        print("⏹️ Stopping recording...")
         audioRecorder?.stop()
         timer?.invalidate()
         stopAudioLevelMonitoring()
@@ -103,20 +110,26 @@ class AudioRecorder: NSObject, ObservableObject {
         isRecording = false
         isPaused = false
         
-        guard let url = audioRecorder?.url else { return nil }
+        guard let url = audioRecorder?.url else { 
+            print("❌ No recording URL found")
+            return nil 
+        }
         
         do {
             let audioData = try Data(contentsOf: url)
             // Clean up the temporary file
             try FileManager.default.removeItem(at: url)
+            print("✅ Recording stopped and data retrieved")
             return audioData
         } catch {
             errorMessage = "Failed to get recording data: \(error.localizedDescription)"
+            print("❌ Error getting recording data: \(error)")
             return nil
         }
     }
     
     func resetRecording() {
+        print("🔄 Resetting recording...")
         audioRecorder?.stop()
         timer?.invalidate()
         stopAudioLevelMonitoring()
@@ -127,13 +140,26 @@ class AudioRecorder: NSObject, ObservableObject {
         audioLevel = 0.0
         errorMessage = nil
         recordingStartTime = nil
+        print("🔄 Recording reset complete")
     }
     
     private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        print("⏱️ Starting timer...")
+        
+        // Stop any existing timer
+        timer?.invalidate()
+        
+        // Create timer on main thread
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self, let startTime = self.recordingStartTime else { return }
-            self.recordingTime = Date().timeIntervalSince(startTime)
+            
+            let elapsed = Date().timeIntervalSince(startTime)
+            self.recordingTime = elapsed
+            
+            print("⏱️ Timer update: \(self.formatTime(elapsed))")
         }
+        
+        print("⏱️ Timer started successfully")
     }
     
     private func startAudioLevelMonitoring() {
