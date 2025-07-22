@@ -16,9 +16,7 @@ struct VisitHistoryView: View {
     @State private var searchText     = ""
     
     private let filters = [
-        "All", "General", "Cardiology", "Dermatology", "Endocrinology", "Gastroenterology",
-        "Neurology", "Oncology", "Ophthalmology", "Orthopedics", "Pediatrics",
-        "Psychiatry", "Pulmonology", "Rheumatology", "Urology", "Other"
+        "All", "Pain Management", "Internal Medicine"
     ]
     
     var body: some View {

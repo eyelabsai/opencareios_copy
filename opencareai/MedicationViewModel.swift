@@ -81,6 +81,7 @@ class MedicationViewModel: ObservableObject {
         do {
             let fetchedMedications = try await firebaseService.getAllUserMedications(userId: userId)
             self.medications = fetchedMedications
+            NotificationManager.shared.scheduleMedicationReminders(for: self.activeMedications)
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -308,6 +308,14 @@ struct AuthenticationView: View {
             Text("Basic Information")
                 .font(.headline)
                 .fontWeight(.semibold)
+            Spacer()
+            Button(action: syncWithHealthKitForRegistration) {
+                            HStack {
+                                Image(systemName: "heart.fill")
+                                Text("Sync with Health")
+                            }
+                            .font(.caption)
+                        }
             
             VStack(spacing: 12) {
                 HStack {
@@ -625,5 +633,45 @@ struct AuthenticationView: View {
         currentStep = 1
         viewModel.errorMessage = nil
         focusedField = nil
+    }
+    
+    private func syncWithHealthKitForRegistration() {
+        HealthKitManager.shared.requestAuthorization { success in
+            guard success else { return }
+            
+            // Fetch characteristics
+            do {
+                let characteristics = try HealthKitManager.shared.fetchCharacteristics()
+                if let dobFromHealth = characteristics.dateOfBirth {
+                    self.dob = dobFromHealth
+                }
+                if let sexObject = characteristics.biologicalSex {
+                    switch sexObject.biologicalSex {
+                    case .female: self.gender = "Female"
+                    case .male: self.gender = "Male"
+                    case .other: self.gender = "Other"
+                    default: self.gender = ""
+                    }
+                }
+            } catch {
+                print("Failed to fetch characteristics: \(error)")
+            }
+            
+            // Fetch height and weight
+            HealthKitManager.shared.fetchMostRecentHeight { heightInInches in
+                if let height = heightInInches {
+                    self.heightFeet = String(Int(height / 12))
+                    self.heightInches = String(Int(height.truncatingRemainder(dividingBy: 12)))
+                }
+            }
+            HealthKitManager.shared.fetchMostRecentWeight { weightInPounds in
+                if let weight = weightInPounds {
+                    self.weight = String(Int(weight.rounded()))
+                }
+            }
+            
+            // Fetch clinical records
+            
+        }
     }
 }
