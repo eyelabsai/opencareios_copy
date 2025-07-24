@@ -4,10 +4,8 @@ import Firebase
 
 @main
 struct opencareai: App {
-    // Register app delegate for Firebase setup
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     
-    // The AuthViewModel will be the single source of truth for authentication state
     @StateObject private var authViewModel = AuthViewModel()
     @StateObject private var appState = AppState()
 

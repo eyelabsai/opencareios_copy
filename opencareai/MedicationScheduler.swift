@@ -60,25 +60,25 @@ class MedicationScheduler: ObservableObject {
         
         let timeline = [MedicationPhase]()
         
-        // Common tapering patterns
+        
         let patterns = [
-            // Pattern 1: "4x daily for 1 week, then 3x daily for 1 week"
+            
             try! NSRegularExpression(pattern: "(\\d+)x?\\s*(?:times?\\s*)?(?:daily|per\\s*day|a\\s*day)\\s*for\\s*(\\d+)\\s*(?:week|wk)s?", options: .caseInsensitive),
             
-            // Pattern 2: "1 drop 4 times daily for 1 week, then 3 times daily for 1 week"
+            
             try! NSRegularExpression(pattern: "(\\d+)\\s*drops?\\s*(\\d+)\\s*times?\\s*daily\\s*for\\s*(\\d+)\\s*(?:week|wk)s?", options: .caseInsensitive),
             
-            // Pattern 3: "Apply 4x daily x 1 week, then 3x daily x 1 week"
+          
             try! NSRegularExpression(pattern: "(?:apply\\s*)?(\\d+)x\\s*daily\\s*x\\s*(\\d+)\\s*(?:week|wk)s?", options: .caseInsensitive),
             
-            // Pattern 4: "Use 4 times per day for 7 days, then 3 times per day for 7 days"
+           
             try! NSRegularExpression(pattern: "(\\d+)\\s*times?\\s*per\\s*day\\s*for\\s*(\\d+)\\s*days?", options: .caseInsensitive)
         ]
         
         var currentDate = actualStartDate
         var matches: [NSTextCheckingResult] = []
         
-        // Try each pattern
+ 
         for pattern in patterns {
             let range = NSRange(location: 0, length: fullInstructions.count)
             let patternMatches = pattern.matches(in: fullInstructions, range: range)
@@ -89,11 +89,11 @@ class MedicationScheduler: ObservableObject {
         }
         
         if matches.isEmpty {
-            // If no tapering pattern found, create a simple schedule
+           
             return createSimpleSchedule(medication: medication, startDate: actualStartDate)
         }
         
-        // Process matches to create timeline
+       
         var phases: [MedicationPhase] = []
         for (index, match) in matches.enumerated() {
             var frequency: Int = 1
@@ -101,14 +101,14 @@ class MedicationScheduler: ObservableObject {
             var dosage: Int = 1
             
             if match.numberOfRanges == 3 {
-                // Pattern: frequency, duration
+               
                 if let frequencyRange = Range(match.range(at: 1), in: fullInstructions),
                    let durationRange = Range(match.range(at: 2), in: fullInstructions) {
                     frequency = Int(fullInstructions[frequencyRange]) ?? 1
                     duration = Int(fullInstructions[durationRange]) ?? 1
                 }
             } else if match.numberOfRanges == 4 {
-                // Pattern: dosage, frequency, duration
+               
                 if let dosageRange = Range(match.range(at: 1), in: fullInstructions),
                    let frequencyRange = Range(match.range(at: 2), in: fullInstructions),
                    let durationRange = Range(match.range(at: 3), in: fullInstructions) {
@@ -157,27 +157,27 @@ class MedicationScheduler: ObservableObject {
         let tomorrowPattern = try! NSRegularExpression(pattern: "(?:start(?:ing)?\\s+)?tomorrow|next\\s+day|beginning\\s+tomorrow", options: .caseInsensitive)
         let todayPattern = try! NSRegularExpression(pattern: "(?:start(?:ing)?\\s+)?today|right\\s+now|immediately", options: .caseInsensitive)
         
-        // Ensure visitDate is a Date object
+       
         let visitDateObj = visitDate ?? Date()
         
         let range = NSRange(location: 0, length: fullInstructions.count)
         
         if tomorrowPattern.firstMatch(in: fullInstructions, range: range) != nil {
-            // If doctor said "starting tomorrow", add 1 day to visit date
+           
             return Calendar.current.date(byAdding: .day, value: 1, to: visitDateObj) ?? visitDateObj
         } else if todayPattern.firstMatch(in: fullInstructions, range: range) != nil {
-            // If doctor said "starting today", use visit date
+            
             return visitDateObj
         } else if let startDate = startDate {
-            // Use provided start date
+          
             return startDate
         } else {
-            // Default to visit date
+            
             return visitDateObj
         }
     }
     
-    // Create simple schedule for non-tapering medications
+    
     private func createSimpleSchedule(medication: Medication, startDate: Date) -> MedicationSchedule? {
         let frequency = medication.frequency
         let duration = medication.duration ?? ""
@@ -185,7 +185,7 @@ class MedicationScheduler: ObservableObject {
         
         if frequency.isEmpty && fullInstructions.isEmpty { return nil }
         
-        // Extract frequency from instructions if not provided
+        
         let timesPerDay = frequency.isEmpty ? extractFrequency(instructions: fullInstructions) : (Int(frequency) ?? 1)
         let durationDays = duration.isEmpty ? (extractDuration(instructions: fullInstructions) ?? 7) : (Int(duration) ?? 7)
         
@@ -388,7 +388,7 @@ class MedicationScheduler: ObservableObject {
             return ("tapering", true, true, "Contains specific tapering instructions")
         }
         
-        // Check for ambiguous language PATTERNS
+        
         if hasAmbiguousEndCondition(instructions: fullInstructions) {
             return ("chronic", false, false, "Contains ambiguous end condition without specific date")
         }

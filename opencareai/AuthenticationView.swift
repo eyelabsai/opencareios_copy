@@ -670,7 +670,6 @@ struct AuthenticationView: View {
                 }
             }
             
-            // Fetch clinical records
             
         }
     }

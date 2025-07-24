@@ -16,7 +16,6 @@ class NotificationManager {
         let center = UNUserNotificationCenter.current()
         
         for medication in medications {
-            // Use the medication's timing string (e.g., "Bedtime") if available
             let times = generateSuggestedTimes(frequency: Int(medication.frequency) ?? 1, timing: medication.timing)
             
             for (time, label) in times {
@@ -41,12 +40,10 @@ class NotificationManager {
         }
     }
 
-    // --- THIS FUNCTION IS NOW UPDATED TO BE SMARTER ---
     private func generateSuggestedTimes(frequency: Int, timing: String?) -> [(Date, String)] {
         var times: [(Date, String)] = []
         let timingLowercased = timing?.lowercased() ?? ""
 
-        // Handle specific timing instructions first
         if timingLowercased.contains("bedtime") {
             return [(userSettings.bedtimeTime, "Bedtime")]
         }
@@ -60,7 +57,6 @@ class NotificationManager {
             return [(userSettings.eveningTime, "Evening")]
         }
 
-        // Fallback to frequency-based times if no specific timing is mentioned
         switch frequency {
         case 1:
             times.append((userSettings.morningTime, "Morning"))

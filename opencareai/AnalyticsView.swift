@@ -5,13 +5,6 @@
 //  Created by Shruthi Sathya on 7/21/25.
 //
 
-//
-//  AnalyticsView.swift
-//  opencareai
-//
-//  Created by Gemini on 7/21/25.
-//
-
 import SwiftUI
 import Charts
 

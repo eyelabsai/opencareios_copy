@@ -52,7 +52,7 @@ class AuthViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            // Convert string allergies and chronicConditions to arrays
+            
             let allergiesArray = allergies.isEmpty ? [] : allergies.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             let chronicConditionsArray = chronicConditions.isEmpty ? [] : chronicConditions.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             
@@ -84,7 +84,7 @@ class AuthViewModel: ObservableObject {
             // Fallback: Prompt user to re-enter profile info if Firestore save failed
             if (error.localizedDescription.contains("user not found") || error.localizedDescription.contains("missing")) {
                 errorMessage = "Profile creation failed. Please re-enter your information."
-                // Optionally, trigger a UI state to show the profile form again
+               
             }
         }
     }

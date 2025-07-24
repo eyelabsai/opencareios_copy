@@ -17,13 +17,11 @@ struct ProfileView: View {
     @EnvironmentObject var visitViewModel: VisitViewModel
     @EnvironmentObject var medicationViewModel: MedicationViewModel
     
-    // State for the report feature
     @State private var reportURL: URL?
     
     @State private var showingAddCondition = false
     @State private var newCondition = ""
     
-    // Gender and blood type options
     private let genderOptions = ["", "Male", "Female", "Other", "Prefer not to say"]
     private let bloodTypeOptions = ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"]
     private let insuranceOptions = ["", "Aetna", "Blue Cross", "Cigna", "UnitedHealthcare", "Kaiser", "None", "Other"]
