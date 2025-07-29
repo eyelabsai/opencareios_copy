@@ -501,24 +501,30 @@ class MedicationScheduler: ObservableObject {
         }
     }
     
-    // Enhanced medication processing with universal classification
+    // Universal medication processing entry point  
     func processUniversalMedication(medication: Medication) -> MedicationSchedule? {
-        let classification = classifyMedicationType(medication: medication)
+        // Use user-set start date if available, otherwise fall back to visit date or current date
+        let startDate = medication.startDate ?? medication.createdAt ?? Date()
+        
+        // Create medication with proper start date for processing
+        var medicationWithStartDate = medication
+        medicationWithStartDate.startDate = startDate
+        
+        // Classify medication type
+        let classification = classifyMedicationType(medication: medicationWithStartDate)
         
         if classification.type == "tapering" {
-            return parseTaperingRegimen(medication: medication)
+            return parseTaperingRegimen(medication: medicationWithStartDate)
         }
         
         if classification.type == "short-term" {
-            // Use createdAt if available, otherwise fall back to current date
-            let startDate = medication.createdAt ?? Date()
-            return createSimpleSchedule(medication: medication, startDate: startDate)
+            return createSimpleSchedule(medication: medicationWithStartDate, startDate: startDate)
         }
         
         // For chronic medications, return simple display without timeline
         return MedicationSchedule(
             medicationName: medication.name,
-            startDate: Date(),
+            startDate: startDate,
             timeline: [],
             totalDuration: 0,
             currentPhase: 0,

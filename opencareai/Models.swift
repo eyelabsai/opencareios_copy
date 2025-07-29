@@ -111,6 +111,7 @@ struct Medication: Codable, Identifiable {
     var instructions: String?
     var fullInstructions: String?
     var isActive: Bool?
+    var startDate: Date?
     var discontinuationReason: String?
     var createdAt: Date?
     var updatedAt: Date?
@@ -181,6 +182,114 @@ extension Medication {
     
     var displayName: String {
         name.capitalized
+    }
+    
+    // MARK: - Date and Progress Tracking
+    
+    var effectiveStartDate: Date {
+        return startDate ?? createdAt ?? Date()
+    }
+    
+    var formattedStartDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: effectiveStartDate)
+    }
+    
+    var formattedStopDate: String? {
+        guard let discontinuedDate = discontinuedDate else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: discontinuedDate)
+    }
+    
+    var durationUsed: String {
+        guard let endDate = discontinuedDate else {
+            // Still active - calculate duration from start to now
+            let days = Calendar.current.dateComponents([.day], from: effectiveStartDate, to: Date()).day ?? 0
+            return "\(days) days (ongoing)"
+        }
+        
+        // Discontinued - calculate actual duration used
+        let days = Calendar.current.dateComponents([.day], from: effectiveStartDate, to: endDate).day ?? 0
+        return "\(days) days"
+    }
+    
+    var medicationStatus: String {
+        if isCurrentlyActive {
+            return "Active"
+        } else {
+            return discontinuationReason ?? "Discontinued"
+        }
+    }
+    
+    var statusColor: String {
+        if isCurrentlyActive {
+            return "green"
+        } else {
+            return "red"
+        }
+    }
+    
+    // MARK: - Smart Schedule Integration
+    
+    var hasSmartSchedule: Bool {
+        guard let instructions = fullInstructions, !instructions.isEmpty else { return false }
+        
+        // Check for tapering patterns (matching web app logic)
+        let taperingPatterns = [
+            "then", "taper", "reduce", "decrease", "step", "wean", "gradually"
+        ]
+        
+        return taperingPatterns.contains { instructions.localizedCaseInsensitiveContains($0) }
+    }
+    
+    var medicationType: String {
+        if hasSmartSchedule {
+            return "tapering"
+        }
+        
+        // Check for specific duration
+        if let dur = duration, !dur.isEmpty, dur != "ongoing" {
+            return "short-term"
+        }
+        
+        return "chronic"
+    }
+    
+    var progressPercentage: Int {
+        guard medicationType != "chronic" else { return 0 }
+        
+        // For short-term medications, calculate progress based on duration
+        guard let durationStr = duration, !durationStr.isEmpty else { return 0 }
+        
+        let totalDays = extractDurationInDays(from: durationStr)
+        guard totalDays > 0 else { return 0 }
+        
+        let daysElapsed = Calendar.current.dateComponents([.day], from: effectiveStartDate, to: Date()).day ?? 0
+        
+        let progress = min(100, max(0, Int((Double(daysElapsed) / Double(totalDays)) * 100)))
+        return progress
+    }
+    
+    private func extractDurationInDays(from durationString: String) -> Int {
+        let lowercased = durationString.lowercased()
+        
+        if lowercased.contains("week") {
+            // Extract number of weeks
+            let numbers = durationString.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            if let weekStr = numbers.first(where: { !$0.isEmpty }), let weeks = Int(weekStr) {
+                return weeks * 7
+            }
+        } else if lowercased.contains("day") {
+            // Extract number of days
+            let numbers = durationString.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            if let dayStr = numbers.first(where: { !$0.isEmpty }), let days = Int(dayStr) {
+                return days
+            }
+        }
+        
+        return 7 // Default to 7 days if can't parse
     }
 }
 
@@ -273,6 +382,7 @@ struct VisitSummary: Codable {
 struct HealthAssistantResponse: Codable {
     let success: Bool
     let answer: String?
+    let medicationActions: [MedicationAction]?
     let error: String?
 }
 

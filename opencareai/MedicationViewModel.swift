@@ -109,7 +109,13 @@ class MedicationViewModel: ObservableObject {
                 return
             }
             
-            try await firebaseService.createMedication(medication, userId: userId)
+            // Ensure startDate is set - use provided startDate or default to current date
+            var medicationWithStartDate = medication
+            if medicationWithStartDate.startDate == nil {
+                medicationWithStartDate.startDate = Date()
+            }
+            
+            try await firebaseService.createMedication(medicationWithStartDate, userId: userId)
             await loadMedicationsAsync() // Reload medications after creation
         } catch {
             errorMessage = error.localizedDescription

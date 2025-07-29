@@ -38,7 +38,37 @@ class OpenCareFirebaseService: ObservableObject {
     func getUserData(userId: String) async throws -> User {
         let document = try await db.collection("users").document(userId).getDocument()
         guard let data = document.data() else {
-            throw FirebaseError.userNotFound
+            // User document doesn't exist, create a default user profile
+            let defaultUser = User(
+                id: userId,
+                email: Auth.auth().currentUser?.email ?? "",
+                firstName: "",
+                lastName: "",
+                dob: "",
+                gender: "",
+                phoneNumber: "",
+                street: "",
+                city: "",
+                state: "",
+                zip: "",
+                insuranceProvider: "",
+                insuranceMemberId: "",
+                allergies: [],
+                chronicConditions: [],
+                heightFeet: "",
+                heightInches: "",
+                weight: "",
+                emergencyContactName: "",
+                emergencyContactPhone: "",
+                primaryPhysician: "",
+                bloodType: "",
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            
+            // Save the default user profile
+            try await saveUser(defaultUser)
+            return defaultUser
         }
         
         // Convert Firestore data to User object safely
@@ -77,7 +107,7 @@ class OpenCareFirebaseService: ObservableObject {
         return user
     }
     
-    private func saveUser(_ user: User) async throws {
+    func saveUser(_ user: User) async throws {
         var dict: [String: Any] = [
             "email": user.email,
             "firstName": user.firstName,
@@ -117,6 +147,34 @@ class OpenCareFirebaseService: ObservableObject {
         var updatedUser = user
         updatedUser.updatedAt = Date()
         try await saveUser(updatedUser)
+    }
+    
+    func deleteUserData(userId: String) async throws {
+        try await db.collection("users").document(userId).delete()
+    }
+    
+    func deleteUserVisits(userId: String) async throws {
+        let visitsSnapshot = try await db.collection("visits")
+            .whereField("userId", isEqualTo: userId)
+            .getDocuments()
+        
+        let batch = db.batch()
+        for document in visitsSnapshot.documents {
+            batch.deleteDocument(document.reference)
+        }
+        try await batch.commit()
+    }
+    
+    func deleteUserMedications(userId: String) async throws {
+        let medicationsSnapshot = try await db.collection("medications")
+            .whereField("userId", isEqualTo: userId)
+            .getDocuments()
+        
+        let batch = db.batch()
+        for document in medicationsSnapshot.documents {
+            batch.deleteDocument(document.reference)
+        }
+        try await batch.commit()
     }
     
     // MARK: - Visit Management

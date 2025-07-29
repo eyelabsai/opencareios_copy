@@ -50,6 +50,7 @@ class UserViewModel: ObservableObject {
             self.user = fetchedUser
         } catch {
             errorMessage = "Failed to fetch profile: \(error.localizedDescription)"
+            print("❌ Error fetching user profile: \(error)")
         }
         
         isLoading = false
@@ -100,5 +101,54 @@ class UserViewModel: ObservableObject {
     func removeAllergy(_ allergy: String) async {
         user.allergies.removeAll { $0 == allergy }
         await updateUserProfile()
+    }
+    
+    func createUserProfile() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            guard let currentUser = Auth.auth().currentUser else {
+                errorMessage = "User not authenticated"
+                isLoading = false
+                return
+            }
+            
+            let newUser = User(
+                id: currentUser.uid,
+                email: currentUser.email ?? "",
+                firstName: "",
+                lastName: "",
+                dob: "",
+                gender: "",
+                phoneNumber: "",
+                street: "",
+                city: "",
+                state: "",
+                zip: "",
+                insuranceProvider: "",
+                insuranceMemberId: "",
+                allergies: [],
+                chronicConditions: [],
+                heightFeet: "",
+                heightInches: "",
+                weight: "",
+                emergencyContactName: "",
+                emergencyContactPhone: "",
+                primaryPhysician: "",
+                bloodType: "",
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            
+            try await firebaseService.saveUser(newUser)
+            self.user = newUser
+            
+        } catch {
+            errorMessage = "Failed to create profile: \(error.localizedDescription)"
+            print("❌ Error creating user profile: \(error)")
+        }
+        
+        isLoading = false
     }
 }

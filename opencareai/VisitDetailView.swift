@@ -282,7 +282,7 @@ struct VisitHeaderView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(visit.specialty ?? "Unknown Specialty")
-                        .font(.largeTitle)
+                        .font(.title)
                         .fontWeight(.bold)
                         .foregroundStyle(
                             LinearGradient(
@@ -291,6 +291,8 @@ struct VisitHeaderView: View {
                                 endPoint: .trailing
                             )
                         )
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                     
                     Text(visit.formattedDate)
                         .font(.title3)
@@ -377,45 +379,6 @@ struct VisitMetaDataView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Visit Information")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                
-                VStack(alignment: .leading, spacing: 16) {
-                    MetaDataItem(
-                        label: "Specialty",
-                        value: visit.specialty ?? "Not specified"
-                    )
-                    
-                    MetaDataItem(
-                        label: "Date",
-                        value: visit.formattedDate
-                    )
-                    
-                    if let medications = visit.medications, !medications.isEmpty {
-                        MetaDataItem(
-                            label: "Medications",
-                            value: "\(medications.count) prescribed"
-                        )
-                    }
-                    
-                    if let chronicConditions = visit.chronicConditions, !chronicConditions.isEmpty {
-                        MetaDataItem(
-                            label: "Conditions",
-                            value: "\(chronicConditions.count) noted"
-                        )
-                    }
-                }
-            }
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-            )
-            
             if let tldr = visit.tldr, !tldr.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Quick Summary")

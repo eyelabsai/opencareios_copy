@@ -20,17 +20,31 @@ struct MedicationView: View {
     
     private var displayedMedications: [Medication] {
         let filtered = medicationViewModel.filteredMedications
-        guard !searchText.isEmpty else { return filtered }
-        return filtered.filter { medication in
+        let searchFiltered = searchText.isEmpty ? filtered : filtered.filter { medication in
             medication.name.localizedCaseInsensitiveContains(searchText) ||
             medication.dosage.localizedCaseInsensitiveContains(searchText) ||
             medication.frequency.localizedCaseInsensitiveContains(searchText)
         }
+        
+        // Apply "Active Only" filter if enabled
+        if showingActiveOnly {
+            return searchFiltered.filter { $0.isActive ?? true }
+        }
+        
+        return searchFiltered
+    }
+    
+    private var activeMedications: [Medication] {
+        displayedMedications.filter { $0.isActive ?? true }
+    }
+    
+    private var discontinuedMedications: [Medication] {
+        displayedMedications.filter { !($0.isActive ?? true) }
     }
     
     var body: some View {
         NavigationView {
-            VStack {
+            VStack(spacing: 0) {
                 // ───── Search / filter bar ─────
                 VStack(spacing: 12) {
                     HStack {
@@ -53,11 +67,17 @@ struct MedicationView: View {
                             .cornerRadius(16)
                         }
                         Spacer()
-                        Text("\(displayedMedications.count) medications")
-                            .font(.caption).foregroundColor(.secondary)
+                        if showingActiveOnly {
+                            Text("\(activeMedications.count) active")
+                                .font(.caption).foregroundColor(.secondary)
+                        } else {
+                            Text("\(displayedMedications.count) total")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
                     }
                 }
                 .padding(.horizontal)
+                .padding(.bottom, 8)
                 
                 // ───── List ─────
                 if medicationViewModel.isLoading {
@@ -73,36 +93,149 @@ struct MedicationView: View {
                     .padding()
                     Spacer()
                 } else {
-                    List(displayedMedications) { med in
-                        MedicationRowView(medication: med, scheduler: scheduler)
-                            .onTapGesture {
-                                print("[DEBUG] Medication tapped: \(med)") // Debug print
-                                selectedMedication = med
-                                showingDetailSheet = true
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                if med.isActive ?? true {
-                                    Button("Discontinue", role: .destructive) {
-                                        Task {
-                                            await medicationViewModel.discontinueMedication(med)
-                                        }
+                    List {
+                        if showingActiveOnly {
+                            // Show only active medications when filter is on
+                            if !activeMedications.isEmpty {
+                                Section {
+                                    ForEach(activeMedications) { med in
+                                        MedicationRowView(medication: med, scheduler: scheduler)
+                                            .onTapGesture {
+                                                print("[DEBUG] Medication tapped: \(med)")
+                                                selectedMedication = med
+                                                showingDetailSheet = true
+                                            }
+                                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                                Button("Discontinue", role: .destructive) {
+                                                    Task {
+                                                        await medicationViewModel.discontinueMedication(med)
+                                                    }
+                                                }
+                                                Button("Delete", role: .destructive) {
+                                                    Task {
+                                                        await medicationViewModel.deleteMedication(med)
+                                                    }
+                                                }
+                                            }
+                                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                            .listRowSeparator(.hidden)
+                                            .listRowBackground(Color.clear)
                                     }
-                                } else {
-                                    Button("Reactivate") {
-                                        Task {
-                                            await medicationViewModel.reactivateMedication(med)
-                                        }
+                                } header: {
+                                    HStack {
+                                        Text("Active Medications")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Text("\(activeMedications.count)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 2)
+                                            .background(Color.blue.opacity(0.2))
+                                            .cornerRadius(8)
                                     }
-                                    .tint(.green)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
                                 }
-                                Button("Delete", role: .destructive) {
-                                    Task {
-                                        await medicationViewModel.deleteMedication(med)
+                            }
+                        } else {
+                            // Show both active and discontinued when filter is off
+                            if !activeMedications.isEmpty {
+                                Section {
+                                    ForEach(activeMedications) { med in
+                                        MedicationRowView(medication: med, scheduler: scheduler)
+                                            .onTapGesture {
+                                                print("[DEBUG] Medication tapped: \(med)")
+                                                selectedMedication = med
+                                                showingDetailSheet = true
+                                            }
+                                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                                Button("Discontinue", role: .destructive) {
+                                                    Task {
+                                                        await medicationViewModel.discontinueMedication(med)
+                                                    }
+                                                }
+                                                Button("Delete", role: .destructive) {
+                                                    Task {
+                                                        await medicationViewModel.deleteMedication(med)
+                                                    }
+                                                }
+                                            }
+                                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                            .listRowSeparator(.hidden)
+                                            .listRowBackground(Color.clear)
                                     }
+                                } header: {
+                                    HStack {
+                                        Text("Active Medications")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Text("\(activeMedications.count)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 2)
+                                            .background(Color.blue.opacity(0.2))
+                                            .cornerRadius(8)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
                                 }
                             }
+                            
+                            if !discontinuedMedications.isEmpty {
+                                Section {
+                                    ForEach(discontinuedMedications) { med in
+                                        MedicationRowView(medication: med, scheduler: scheduler)
+                                            .onTapGesture {
+                                                print("[DEBUG] Medication tapped: \(med)")
+                                                selectedMedication = med
+                                                showingDetailSheet = true
+                                            }
+                                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                                Button("Reactivate") {
+                                                    Task {
+                                                        await medicationViewModel.reactivateMedication(med)
+                                                    }
+                                                }
+                                                .tint(.green)
+                                                Button("Delete", role: .destructive) {
+                                                    Task {
+                                                        await medicationViewModel.deleteMedication(med)
+                                                    }
+                                                }
+                                            }
+                                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                            .listRowSeparator(.hidden)
+                                            .listRowBackground(Color.clear)
+                                    }
+                                } header: {
+                                    HStack {
+                                        Text("Discontinued Medications")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text("\(discontinuedMedications.count)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 2)
+                                            .background(Color.gray.opacity(0.2))
+                                            .cornerRadius(8)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                }
+                            }
+                        }
                     }
                     .listStyle(.plain)
+                    .background(Color(.systemGroupedBackground))
                 }
             }
             .navigationTitle("Medications")
@@ -131,29 +264,89 @@ struct MedicationRowView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 Circle()
                     .fill(medication.isActive ?? true ? Color.green : Color.gray)
                     .frame(width: 8, height: 8)
+                    .padding(.top, 4)
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(medication.name)
                             .font(.headline).fontWeight(.semibold)
                             .foregroundColor(medication.isActive ?? true ? .primary : .secondary)
+                            .lineLimit(2)
                         Spacer()
+                        
+                        // Medication type badge
+                        HStack(spacing: 4) {
+                            if medication.hasSmartSchedule {
+                                Image(systemName: "calendar")
+                                    .font(.caption2)
+                                Text("Smart Schedule")
+                                    .font(.caption2)
+                            } else if medication.medicationType == "chronic" {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption2)
+                                Text("Ongoing")
+                                    .font(.caption2)
+                            }
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(4)
+                        
                         Text(medication.dosage)
                             .font(.caption)
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .background(Color.blue.opacity(0.2)).cornerRadius(4)
                     }
+                    
                     Text(medication.frequency)
                         .font(.subheadline).foregroundColor(.secondary)
-                    if let timing = medication.timing {
+                        .lineLimit(1)
+                    
+                    if let timing = medication.timing, !timing.isEmpty {
                         Text("Timing: \(timing)").font(.caption).foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
+                    
+                    // Start date and duration information
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            if medication.isActive ?? true {
+                                Text("Started: \(medication.formattedStartDate)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                Text("Duration: \(medication.durationUsed)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            } else {
+                                Text("Started: \(medication.formattedStartDate)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                if let stopDate = medication.formattedStopDate {
+                                    Text("Stopped: \(stopDate)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Text("Duration: \(medication.durationUsed)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                    }
+                    
                     if !(medication.isActive ?? true) {
-                        Text("Discontinued")
+                        Text(medication.medicationStatus)
                             .font(.caption).foregroundColor(.red)
                             .padding(.horizontal, 8).padding(.vertical, 2)
                             .background(Color.red.opacity(0.1)).cornerRadius(4)
@@ -161,6 +354,29 @@ struct MedicationRowView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+                    .padding(.top, 4)
+            }
+            
+            // Progress bar for short-term medications
+            if medication.medicationType != "chronic" && medication.progressPercentage > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Progress")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(medication.progressPercentage)%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    ProgressView(value: Double(medication.progressPercentage), total: 100.0)
+                        .progressViewStyle(.linear)
+                        .scaleEffect(y: 0.6)
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(2)
+                }
             }
             
             // Smart-schedule preview
@@ -169,7 +385,11 @@ struct MedicationRowView: View {
                 SmartScheduleView(schedule: schedule, scheduler: scheduler)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 4)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
         .opacity(medication.isActive ?? true ? 1 : 0.6)
     }
 }
@@ -192,22 +412,91 @@ struct SmartScheduleView: View {
                         .font(.caption2).foregroundColor(.secondary)
                 }
             }
+            
             if schedule.hasSchedule {
-                ProgressView(value: Double(schedule.overallProgress), total: 100)
-                    .progressViewStyle(.linear).scaleEffect(y: 0.5)
-                let status = scheduler.getMedicationStatus(medicationSchedule: schedule)
-                Text(status.message).font(.caption).foregroundColor(.secondary)
-                if let days = status.daysRemaining, days > 0 {
-                    Text("\(days) days remaining")
-                        .font(.caption2).foregroundColor(.orange)
+                // Overall progress bar
+                VStack(alignment: .leading, spacing: 4) {
+                    ProgressView(value: Double(schedule.overallProgress), total: 100)
+                        .progressViewStyle(.linear)
+                        .scaleEffect(y: 0.6)
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(2)
                 }
-            } else {
-                Text(schedule.message ?? "Continue as prescribed")
-                    .font(.caption).foregroundColor(.secondary)
+                
+                let status = scheduler.getMedicationStatus(medicationSchedule: schedule)
+                
+                // Current status
+                HStack {
+                    Text(status.message)
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                    Spacer()
+                    if let days = status.daysRemaining, days > 0 {
+                        Text("\(days) days left")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(6)
+                
+                // Timeline phases (show first 3 phases)
+                if schedule.timeline.count > 1 {
+                    VStack(spacing: 4) {
+                        ForEach(Array(schedule.timeline.prefix(3).enumerated()), id: \.offset) { index, phase in
+                            HStack(spacing: 8) {
+                                // Phase indicator
+                                Circle()
+                                    .fill(phase.isCompleted ? Color.green : phase.isActive ? Color.blue : Color.gray.opacity(0.3))
+                                    .frame(width: 8, height: 8)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Phase \(phase.phase): \(phase.instruction)")
+                                        .font(.caption2)
+                                        .foregroundColor(phase.isActive ? .primary : .secondary)
+                                    
+                                    Text("\(formatDate(phase.startDate)) - \(formatDate(phase.endDate))")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if phase.isCompleted {
+                                    Text("✓")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                } else if phase.isActive && phase.daysRemaining > 0 {
+                                    Text("\(phase.daysRemaining)d")
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                        
+                        if schedule.timeline.count > 3 {
+                            Text("... and \(schedule.timeline.count - 3) more phases")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .padding(.leading, 16)
+                        }
+                    }
+                }
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color.blue.opacity(0.05)).cornerRadius(8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.05))
+        .cornerRadius(8)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }
 

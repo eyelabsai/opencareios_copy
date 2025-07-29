@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit // Keep this import for the DocumentExporter
+import FirebaseAuth
 
 struct ProfileView: View {
     @StateObject private var viewModel = UserViewModel()
@@ -21,6 +22,12 @@ struct ProfileView: View {
     
     @State private var showingAddCondition = false
     @State private var newCondition = ""
+    @State private var showingDeleteAccountAlert = false
+    @State private var showingDeleteConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var showingReauthAlert = false
+    @State private var reauthPassword = ""
+    @State private var showingPasswordPrompt = false
     
     private let genderOptions = ["", "Male", "Female", "Other", "Prefer not to say"]
     private let bloodTypeOptions = ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"]
@@ -43,12 +50,31 @@ struct ProfileView: View {
                     chronicConditionsSection
                     accountActionsSection
                     
+                    // Delete Account Section
+                    deleteAccountSection
+                    
                     if let errorMessage = viewModel.errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .padding()
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(8)
+                        VStack(spacing: 12) {
+                            Text(errorMessage)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                            
+                            if errorMessage.contains("User not found") {
+                                Button("Create Profile") {
+                                    Task {
+                                        await viewModel.createUserProfile()
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.blue)
+                                .cornerRadius(8)
+                            }
+                        }
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(8)
                     }
                 }
                 .padding()
@@ -104,10 +130,14 @@ struct ProfileView: View {
                     ), displayedComponents: .date).labelsHidden()
                 }
                 HStack {
-                    Image(systemName: "person.2.fill").foregroundColor(.blue).frame(width: 20)
+                    Image(systemName: "person.2.fill")
+                        .foregroundColor(.blue)
+                        .frame(width: 20)
                     Picker("Gender", selection: $viewModel.user.gender) {
-                        ForEach(genderOptions, id: \.self) { Text($0) }
-                    }.pickerStyle(MenuPickerStyle())
+                        Text("Select").tag("")
+                        ForEach(genderOptions.filter { !$0.isEmpty }, id: \.self) { Text($0).tag($0) }
+                    }
+                    .pickerStyle(MenuPickerStyle())
                 }
                 HStack {
                     Image(systemName: "phone.fill").foregroundColor(.blue).frame(width: 20)
@@ -125,9 +155,13 @@ struct ProfileView: View {
                 HStack {
                     TextField("City", text: $viewModel.user.city).textFieldStyle(RoundedBorderTextFieldStyle())
                     Picker("State", selection: $viewModel.user.state) {
-                        ForEach(stateOptions, id: \.self) { Text($0) }
-                    }.pickerStyle(MenuPickerStyle())
-                    TextField("ZIP", text: $viewModel.user.zip).textFieldStyle(RoundedBorderTextFieldStyle()).keyboardType(.numbersAndPunctuation)
+                        Text("Select").tag("")
+                        ForEach(stateOptions.filter { !$0.isEmpty }, id: \.self) { Text($0).tag($0) }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    TextField("ZIP", text: $viewModel.user.zip)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .keyboardType(.numbersAndPunctuation)
                 }
             }
         }.padding().background(Color(.systemBackground)).cornerRadius(16).shadow(radius: 2)
@@ -138,9 +172,12 @@ struct ProfileView: View {
             Text("Insurance").font(.headline).fontWeight(.semibold)
             VStack(spacing: 12) {
                 Picker("Insurance Provider", selection: $viewModel.user.insuranceProvider) {
-                    ForEach(insuranceOptions, id: \.self) { Text($0) }
-                }.pickerStyle(MenuPickerStyle())
-                TextField("Insurance Member ID", text: $viewModel.user.insuranceMemberId).textFieldStyle(RoundedBorderTextFieldStyle())
+                    Text("Select").tag("")
+                    ForEach(insuranceOptions.filter { !$0.isEmpty }, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(MenuPickerStyle())
+                TextField("Insurance Member ID", text: $viewModel.user.insuranceMemberId)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
             }
         }.padding().background(Color(.systemBackground)).cornerRadius(16).shadow(radius: 2)
     }
@@ -169,23 +206,35 @@ struct ProfileView: View {
                 HStack {
                     Text("Height:")
                     Picker("Feet", selection: $viewModel.user.heightFeet) {
-                        ForEach((4...7).map { String($0) }, id: \.self) { Text("\($0) ft") }
-                    }.pickerStyle(MenuPickerStyle())
+                        Text("Select").tag("")
+                        ForEach((4...7).map { String($0) }, id: \.self) { Text("\($0) ft").tag(String($0)) }
+                    }
+                    .pickerStyle(MenuPickerStyle())
                     Picker("Inches", selection: $viewModel.user.heightInches) {
-                        ForEach((0...11).map { String($0) }, id: \.self) { Text("\($0) in") }
-                    }.pickerStyle(MenuPickerStyle())
+                        Text("Select").tag("")
+                        ForEach((0...11).map { String($0) }, id: \.self) { Text("\($0) in").tag(String($0)) }
+                    }
+                    .pickerStyle(MenuPickerStyle())
                 }
                 HStack {
                     Text("Weight:")
                     Picker("Weight", selection: $viewModel.user.weight) {
-                        ForEach((80...400).map { String($0) }, id: \.self) { Text("\($0) lbs") }
-                    }.pickerStyle(MenuPickerStyle())
+                        Text("Select").tag("")
+                        ForEach((80...400).map { String($0) }, id: \.self) { Text("\($0) lbs").tag(String($0)) }
+                    }
+                    .pickerStyle(MenuPickerStyle())
                 }
                 Picker("Blood Type", selection: $viewModel.user.bloodType) {
-                    ForEach(bloodTypeOptions, id: \.self) { Text($0) }
-                }.pickerStyle(MenuPickerStyle())
+                    Text("Select").tag("")
+                    ForEach(bloodTypeOptions.filter { !$0.isEmpty }, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(MenuPickerStyle())
             }
-        }.padding().background(Color(.systemBackground)).cornerRadius(16).shadow(radius: 2)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(radius: 2)
     }
     
     private var healthKitSection: some View {
@@ -200,14 +249,6 @@ struct ProfileView: View {
                         .foregroundColor(.red)
                     Text("Sync with Health App")
                     Spacer()
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(radius: 2)
-    }
 
     private var appearanceSection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -357,6 +398,89 @@ struct ProfileView: View {
             rootViewController.present(documentPicker, animated: true, completion: nil)
         }
     
+    private var deleteAccountSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Danger Zone")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.red)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Delete My Account")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.red)
+                
+                Text("This action will permanently delete your account and all associated data including visits, medications, and health records. This cannot be undone.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(nil)
+            }
+            
+            Button(action: {
+                showingDeleteConfirmation = true
+            }) {
+                HStack {
+                    if isDeletingAccount {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .foregroundColor(.white)
+                    } else {
+                        Image(systemName: "trash.fill")
+                    }
+                    Text(isDeletingAccount ? "Deleting Account..." : "Delete My Account")
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .cornerRadius(8)
+            }
+            .disabled(isDeletingAccount)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(radius: 2)
+        .alert("Delete Account", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete My Account", role: .destructive) {
+                deleteAccount()
+            }
+        } message: {
+            Text("Are you sure you want to delete your account? This will permanently erase all your saved data including visits, medications, and health records. This action cannot be undone.")
+        }
+        .alert("Account Deletion Failed", isPresented: $showingDeleteAccountAlert) {
+            Button("OK") { }
+        } message: {
+            Text("There was an error deleting your account. Please try again or contact support if the problem persists.")
+        }
+        .alert("Re-authentication Required", isPresented: $showingReauthAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Re-authenticate") {
+                showingPasswordPrompt = true
+            }
+        } message: {
+            Text("For security reasons, you need to re-enter your password before deleting your account.")
+        }
+        .sheet(isPresented: $showingPasswordPrompt) {
+            ReauthenticationView(
+                password: $reauthPassword,
+                onAuthenticate: { password in
+                    Task {
+                        await reauthenticateAndDelete(password: password)
+                    }
+                },
+                onCancel: {
+                    showingPasswordPrompt = false
+                    reauthPassword = ""
+                }
+            )
+        }
+    }
+    
+    // Helper functions for date conversion
+>>>>>>> 5ea5c47 (delete account feature)
     private func dateFromString(_ str: String) -> Date? {
         let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"; return formatter.date(from: str)
     }
@@ -364,7 +488,207 @@ struct ProfileView: View {
     private func stringFromDate(_ date: Date) -> String {
         let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"; return formatter.string(from: date)
     }
-} // --- THIS IS THE CORRECT CLOSING BRACE FOR THE ProfileView STRUCT ---
+    
+    // MARK: - Account Deletion
+    private func deleteAccount() {
+        isDeletingAccount = true
+        
+        Task {
+            do {
+                // First, delete user data from Firestore
+                try await deleteUserData()
+                
+                // Then delete the Firebase Auth account
+                try await deleteFirebaseAccount()
+                
+                // Success - user will be automatically signed out
+                await MainActor.run {
+                    isDeletingAccount = false
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isDeletingAccount = false
+                    
+                    // Check if it's a re-authentication error
+                    let errorDescription = error.localizedDescription
+                    if errorDescription.contains("requires recent authentication") || 
+                       errorDescription.contains("ERROR_REQUIRES_RECENT_LOGIN") {
+                        showingReauthAlert = true
+                    } else {
+                        showingDeleteAccountAlert = true
+                    }
+                }
+                print("❌ Error deleting account: \(error)")
+                print("❌ Error domain: \(error._domain)")
+                print("❌ Error code: \(error._code)")
+                print("❌ Error description: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func deleteUserData() async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "AccountDeletion", code: 1, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        let firebaseService = OpenCareFirebaseService.shared
+        
+        // Delete user profile
+        try await firebaseService.deleteUserData(userId: userId)
+        
+        // Delete user visits
+        try await firebaseService.deleteUserVisits(userId: userId)
+        
+        // Delete user medications
+        try await firebaseService.deleteUserMedications(userId: userId)
+        
+        print("✅ User data deleted successfully")
+    }
+    
+    private func deleteFirebaseAccount() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(domain: "AccountDeletion", code: 2, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        try await user.delete()
+        print("✅ Firebase account deleted successfully")
+    }
+    
+    private func reauthenticateAndDelete(password: String) async {
+        guard let user = Auth.auth().currentUser,
+              let email = user.email else {
+            await MainActor.run {
+                showingDeleteAccountAlert = true
+            }
+            return
+        }
+        
+        do {
+            // Re-authenticate the user
+            let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+            try await user.reauthenticate(with: credential)
+            
+            // Now try to delete the account again
+            try await deleteUserData()
+            try await user.delete()
+            
+            await MainActor.run {
+                isDeletingAccount = false
+                showingPasswordPrompt = false
+                reauthPassword = ""
+            }
+            
+            print("✅ Account deleted successfully after re-authentication")
+            
+        } catch {
+            await MainActor.run {
+                isDeletingAccount = false
+                showingPasswordPrompt = false
+                reauthPassword = ""
+                showingDeleteAccountAlert = true
+            }
+            print("❌ Error during re-authentication: \(error)")
+        }
+    }
+}
+
+// MARK: - Reauthentication View
+struct ReauthenticationView: View {
+    @Binding var password: String
+    let onAuthenticate: (String) -> Void
+    let onCancel: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var isLoading = false
+    @State private var showError = false
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 16) {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 60))
+                        .foregroundColor(.red)
+                    
+                    Text("Security Verification")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text("For your security, please enter your password to confirm account deletion.")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Password Field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Password")
+                        .font(.headline)
+                        .fontWeight(.medium)
+                    
+                    SecureField("Enter your password", text: $password)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                }
+                
+                // Action Buttons
+                VStack(spacing: 12) {
+                    Button(action: {
+                        isLoading = true
+                        onAuthenticate(password)
+                    }) {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .foregroundColor(.white)
+                            } else {
+                                Image(systemName: "trash.fill")
+                            }
+                            Text(isLoading ? "Verifying..." : "Delete Account")
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(8)
+                    }
+                    .disabled(password.isEmpty || isLoading)
+                    
+                    Button(action: {
+                        onCancel()
+                        dismiss()
+                    }) {
+                        Text("Cancel")
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.systemGray5))
+                            .cornerRadius(8)
+                    }
+                    .disabled(isLoading)
+                }
+                
+                Spacer()
+            }
+            .padding(24)
+            .navigationTitle("Verify Identity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                    .disabled(isLoading)
+                }
+            }
+        }
+    }
+}
+>>>>>>> 5ea5c47 (delete account feature)
 
 // MARK: - Helper Structs
 struct AddConditionSheet: View {

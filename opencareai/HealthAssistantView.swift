@@ -12,6 +12,8 @@ import SwiftUI
 struct HealthAssistantView: View {
     @StateObject private var viewModel = HealthAssistantViewModel()
     @State private var messageText = ""
+    @State private var showingMedicationActionAlert = false
+    @State private var medicationActionMessage = ""
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
@@ -89,6 +91,26 @@ struct HealthAssistantView: View {
                     .disabled(viewModel.messages.isEmpty)
                 }
             }
+            .alert("Medication Action", isPresented: $showingMedicationActionAlert) {
+                Button("OK") { 
+                    viewModel.clearSuccessMessage()
+                    viewModel.clearError()
+                }
+            } message: {
+                Text(medicationActionMessage)
+            }
+            .onChange(of: viewModel.errorMessage) { errorMessage in
+                if let error = errorMessage, error.contains("medication actions") {
+                    medicationActionMessage = error
+                    showingMedicationActionAlert = true
+                }
+            }
+            .onChange(of: viewModel.successMessage) { successMessage in
+                if let success = successMessage, !success.isEmpty {
+                    medicationActionMessage = success
+                    showingMedicationActionAlert = true
+                }
+            }
         }
     }
     
@@ -154,7 +176,9 @@ struct HealthAssistantView: View {
         "Summarize my recent doctor visits",
         "What are my chronic conditions?",
         "Are there any drug interactions I should know about?",
-        "When was my last cardiology visit?"
+        "When was my last cardiology visit?",
+        "I want to stop taking my blood pressure medication",
+        "I no longer need my allergy medication"
     ]
 }
 

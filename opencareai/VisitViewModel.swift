@@ -14,6 +14,7 @@ class VisitViewModel: ObservableObject {
     @Published var transcript: String = "" // Add transcript property to match web app
     @Published var visits: [Visit] = [] // Add visits property back
     @Published var medicationViewModel = MedicationViewModel() // Add this property
+
     
     private let apiService = APIService.shared
     private let firebaseService = OpenCareFirebaseService.shared
@@ -467,6 +468,15 @@ class VisitViewModel: ObservableObject {
         
         do {
             print("🔊 Saving visit to Firebase...")
+            
+            // Convert medication action strings back to MedicationAction objects
+            let medicationActions = summary.medicationActions.compactMap { actionString -> MedicationAction? in
+                guard let actionType = MedicationActionType(rawValue: actionString) else { return nil }
+                // We need to extract the medication name from the action string
+                // Since we only have action types as strings, we'll need to reconstruct from medications
+                return nil // We'll handle this differently
+            }
+            
             let visit = Visit(
                 userId: userId,
                 date: Date(),
@@ -474,22 +484,35 @@ class VisitViewModel: ObservableObject {
                 summary: summary.summary,
                 tldr: summary.tldr,
                 medications: summary.medications,
-                medicationActions: nil,
+                medicationActions: medicationActions,
                 chronicConditions: summary.chronicConditions,
                 createdAt: Date(),
                 updatedAt: Date()
             )
             
-            try await firebaseService.createVisit(visit, userId: userId)
+
             
-            // Add medications to global collection
-            print("🔊 Adding medications to global collection...")
+            // Save visit first
+            try await firebaseService.createVisit(visit, userId: userId)
+            print("🔊 Visit saved successfully")
+            
+            // Process medication actions from the visit summary/transcript
+            await processMedicationActionsFromSummary(summary)
+            
+            // Add new medications to global collection (only the ones that aren't stopped)
+            print("🔊 Adding new medications to global collection...")
             for med in summary.medications {
-                await medicationViewModel.createMedication(med)
+                // Only add if it's marked as active (not stopped during the visit)
+                if med.isActive ?? true {
+                    await medicationViewModel.createMedication(med)
+                } else {
+                    print("🛑 Skipping discontinued medication: \(med.name)")
+                }
             }
             
-            // Reload visits
+            // Reload visits and medications
             await loadVisitsAsync()
+            await medicationViewModel.loadMedicationsAsync()
             
             currentStep = .completed
             showingSuccess = true
@@ -502,7 +525,118 @@ class VisitViewModel: ObservableObject {
         isLoading = false
     }
     
-    func resetRecording() {
+
+    
+    // MARK: - Process Medication Actions from Summary
+    @MainActor
+    private func processMedicationActionsFromSummary(_ summary: VisitSummary) async {
+        print("🔊 Processing medication actions from visit summary...")
+        
+        // Check if the summary or transcript contains stop/discontinue instructions
+        let transcript = self.transcript.lowercased()
+        let summaryText = summary.summary.lowercased()
+        
+        // Look for stop/discontinue patterns in the text
+        let stopPatterns = [
+            "stop\\s+(?:the\\s+use\\s+of\\s+)?([a-zA-Z0-9\\-\\s]+)",
+            "discontinue\\s+(?:the\\s+use\\s+of\\s+)?([a-zA-Z0-9\\-\\s]+)",
+            "no\\s+longer\\s+(?:use\\s+|need\\s+)?([a-zA-Z0-9\\-\\s]+)",
+            "cease\\s+(?:the\\s+use\\s+of\\s+)?([a-zA-Z0-9\\-\\s]+)"
+        ]
+        
+        for pattern in stopPatterns {
+            do {
+                let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+                
+                // Check both transcript and summary
+                let textsToCheck = [transcript, summaryText]
+                
+                for text in textsToCheck {
+                    let matches = regex.matches(in: text, options: [], range: NSRange(text.startIndex..., in: text))
+                    
+                    for match in matches {
+                        if let nameRange = Range(match.range(at: 1), in: text) {
+                            let medicationName = String(text[nameRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            
+                            // Clean up the medication name (remove common suffixes)
+                            let cleanedName = medicationName
+                                .replacingOccurrences(of: " drops?", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: " tablets?", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: " capsules?", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: " ointment", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: " eye drops?", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: " solution", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: " cream", with: "", options: .regularExpression)
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                            
+                            print("🔍 Found stop instruction for medication: '\(cleanedName)'")
+                            
+                            // Try to find and discontinue the medication
+                            await discontinueMedicationByName(cleanedName, reason: "Discontinued per doctor's instructions during visit")
+                        }
+                    }
+                }
+            } catch {
+                print("❌ Error processing stop pattern: \(pattern) - \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Discontinue Medication by Name
+    @MainActor
+    private func discontinueMedicationByName(_ medicationName: String, reason: String) async {
+        print("🔍 Attempting to discontinue medication: '\(medicationName)'")
+        
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("❌ User not authenticated")
+            return
+        }
+        
+        do {
+            // Get all user medications (including active ones)
+            let medications = try await firebaseService.getUserMedications(userId: userId)
+            print("🔍 Searching among \(medications.count) medications: \(medications.map { $0.name })")
+            
+            // Try exact match first
+            if let exactMatch = medications.first(where: { $0.name.lowercased() == medicationName.lowercased() }) {
+                print("✅ Found exact match: \(exactMatch.name)")
+                try await firebaseService.discontinueMedication(medicationId: exactMatch.id!, reason: reason)
+                print("🛑 Successfully discontinued: \(exactMatch.name)")
+                return
+            }
+            
+            // Try partial match
+            if let partialMatch = medications.first(where: { 
+                $0.name.lowercased().contains(medicationName.lowercased()) || 
+                medicationName.lowercased().contains($0.name.lowercased()) 
+            }) {
+                print("✅ Found partial match: \(partialMatch.name) for '\(medicationName)'")
+                try await firebaseService.discontinueMedication(medicationId: partialMatch.id!, reason: reason)
+                print("🛑 Successfully discontinued: \(partialMatch.name)")
+                return
+            }
+            
+            // Try category matching for common medication types
+            let searchName = medicationName.lowercased()
+            if searchName.contains("latanoprost") {
+                if let latanoprostMed = medications.first(where: { $0.name.lowercased().contains("latanoprost") }) {
+                    print("✅ Found latanoprost medication: \(latanoprostMed.name)")
+                    try await firebaseService.discontinueMedication(medicationId: latanoprostMed.id!, reason: reason)
+                    print("🛑 Successfully discontinued: \(latanoprostMed.name)")
+                    return
+                }
+            }
+            
+            print("❌ No matching medication found for: '\(medicationName)'")
+            
+        } catch {
+            print("❌ Error discontinuing medication '\(medicationName)': \(error)")
+                 }
+     }
+     
+     
+     
+     func resetRecording() {
         progressValue = 0.0
         currentStep = .ready
         visitSummary = nil
