@@ -804,15 +804,154 @@ struct NewVisitView: View {
         }
     }
     
+    // MARK: - Missing Functions
+    private func createTempVisitFromSummary(_ summary: VisitSummary) -> Visit {
+        return Visit(
+            id: UUID().uuidString,
+            date: Date(),
+            specialty: summary.specialty,
+            summary: summary.summary,
+            medications: summary.medications,
+            keyInsights: summary.keyInsights,
+            actionItems: summary.actionItems,
+            followUpDate: summary.followUpDate,
+            transcript: visitViewModel.transcript
+        )
+    }
+    
+    private func saveVisit() {
+        Task {
+            await visitViewModel.saveVisit()
+            visitSaved = true
+            savedVisit = visitViewModel.currentVisit
+        }
+    }
+    
+    private var newVisitRecordingControls: some View {
+        VStack(spacing: 16) {
+            if audioRecorder.isRecording {
+                Button(action: {
+                    audioRecorder.stopRecording()
+                    Task {
+                        await visitViewModel.processRecording()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "stop.fill")
+                        Text("Stop Recording")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red)
+                    .cornerRadius(12)
+                }
+            } else {
+                Button(action: {
+                    Task {
+                        let permission = await audioRecorder.requestPermission()
+                        if permission {
+                            audioRecorder.startRecording()
+                        } else {
+                            showingPermissionAlert = true
+                        }
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "mic.fill")
+                        Text("Start Recording")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+                }
+            }
+        }
+    }
+    
+    private var newVisitTranscriptSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Transcript")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            ScrollView {
+                Text(visitViewModel.transcript)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+            }
+            .frame(maxHeight: 200)
+        }
+    }
+    
+    private func newVisitSummarySection(summary: VisitSummary) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Visit Summary")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            if !summary.specialty.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Specialty")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    Text(summary.specialty)
+                        .font(.body)
+                }
+            }
+            
+            if !summary.summary.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Summary")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    Text(summary.summary)
+                        .font(.body)
+                }
+            }
+            
+            if !summary.medications.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Medications")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    
+                    ForEach(summary.medications) { medication in
+                        HStack {
+                            Text(medication.name)
+                            Spacer()
+                            Text(medication.dosage)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+    
     private var newVisitHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Record New Visit")
                 .font(.largeTitle)
->>>>>>> 5ea5c47 (delete account feature)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
             
-            Text(title)
+            Text("Capture your medical visit with AI-powered assistance")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fontWeight(.medium)

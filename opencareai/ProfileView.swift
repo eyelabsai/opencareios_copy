@@ -91,7 +91,41 @@ struct ProfileView: View {
                     showingAddCondition = false
                 })
             }
-            // --- This is the correct placement for the sheet modifier ---
+            .alert("Delete Account", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete My Account", role: .destructive) {
+                    deleteAccount()
+                }
+            } message: {
+                Text("Are you sure you want to delete your account? This will permanently erase all your saved data including visits, medications, and health records. This action cannot be undone.")
+            }
+            .alert("Account Deletion Failed", isPresented: $showingDeleteAccountAlert) {
+                Button("OK") { }
+            } message: {
+                Text("There was an error deleting your account. Please try again or contact support if the problem persists.")
+            }
+            .alert("Re-authentication Required", isPresented: $showingReauthAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Re-authenticate") {
+                    showingPasswordPrompt = true
+                }
+            } message: {
+                Text("For security reasons, you need to re-enter your password before deleting your account.")
+            }
+            .sheet(isPresented: $showingPasswordPrompt) {
+                ReauthenticationView(
+                    password: $reauthPassword,
+                    onAuthenticate: { password in
+                        Task {
+                            await reauthenticateAndDelete(password: password)
+                        }
+                    },
+                    onCancel: {
+                        showingPasswordPrompt = false
+                        reauthPassword = ""
+                    }
+                )
+            }
         }
     }
     
@@ -249,7 +283,17 @@ struct ProfileView: View {
                         .foregroundColor(.red)
                     Text("Sync with Health App")
                     Spacer()
-
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(radius: 2)
+    }
+    
     private var appearanceSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Appearance").font(.headline).fontWeight(.semibold)
@@ -442,45 +486,9 @@ struct ProfileView: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(radius: 2)
-        .alert("Delete Account", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete My Account", role: .destructive) {
-                deleteAccount()
-            }
-        } message: {
-            Text("Are you sure you want to delete your account? This will permanently erase all your saved data including visits, medications, and health records. This action cannot be undone.")
-        }
-        .alert("Account Deletion Failed", isPresented: $showingDeleteAccountAlert) {
-            Button("OK") { }
-        } message: {
-            Text("There was an error deleting your account. Please try again or contact support if the problem persists.")
-        }
-        .alert("Re-authentication Required", isPresented: $showingReauthAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Re-authenticate") {
-                showingPasswordPrompt = true
-            }
-        } message: {
-            Text("For security reasons, you need to re-enter your password before deleting your account.")
-        }
-        .sheet(isPresented: $showingPasswordPrompt) {
-            ReauthenticationView(
-                password: $reauthPassword,
-                onAuthenticate: { password in
-                    Task {
-                        await reauthenticateAndDelete(password: password)
-                    }
-                },
-                onCancel: {
-                    showingPasswordPrompt = false
-                    reauthPassword = ""
-                }
-            )
-        }
     }
     
     // Helper functions for date conversion
->>>>>>> 5ea5c47 (delete account feature)
     private func dateFromString(_ str: String) -> Date? {
         let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"; return formatter.date(from: str)
     }
@@ -688,7 +696,6 @@ struct ReauthenticationView: View {
         }
     }
 }
->>>>>>> 5ea5c47 (delete account feature)
 
 // MARK: - Helper Structs
 struct AddConditionSheet: View {
